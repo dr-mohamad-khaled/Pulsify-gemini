@@ -139,6 +139,13 @@ portrait c7 --ei char 7 --ei env 0 --ei coat 0
 portrait c2 --ei char 2 --ei env 0
 portrait c3 --ei char 3 --ei env 0 --ei coat 1
 portrait c3b --ei char 3 --ei env 1 --ei coat 0
+# 3D kitty: each body shape, then one plugged in (she notices the cable, plays, naps).
+portrait k3a --ei char 3 --ei env 0 --ei coat 1 --ei style 1
+portrait k3b --ei char 3 --ei env 1 --ei coat 0 --ei style 2
+portrait k3c --ei char 3 --ei env 2 --ei coat 3 --ei style 3
+adb shell dumpsys battery set ac 1
+portrait k3charge --ei char 3 --ei env 0 --ei coat 2 --ei style 1 --ei charging 1
+adb shell dumpsys battery unplug
 portrait loopswitch --ei video 0 --ei video2 8
 portrait sky2 --ei char 0 --ei variant 2
 touchy() {  # name, extras: swipes and taps on the wallpaper, then shots
@@ -153,6 +160,7 @@ touchy() {  # name, extras: swipes and taps on the wallpaper, then shots
   sleep 2; timeout 30 adb exec-out screencap -p > "$OUT/portraits/${name}_3.png" 2>/dev/null || true
 }
 touchy sky3 --ei char 0 --ei variant 3
+touchy k3touch --ei char 3 --ei env 0 --ei coat 1 --ei style 2
 touchy sky4 --ei char 0 --ei variant 4
 # Home-screen friends playground: many shots over ~24 s to catch swipe reactions and games.
 friends() {  # name, picks

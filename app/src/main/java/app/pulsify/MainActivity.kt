@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
                 p.character = i.getIntExtra("char", 1)
                 if (i.hasExtra("env")) p.env = i.getIntExtra("env", 0)
                 if (i.hasExtra("coat")) p.coat = i.getIntExtra("coat", 0)
+                p.style = i.getIntExtra("style", 0)
                 if (i.hasExtra("variant")) p.variant = i.getIntExtra("variant", 0)
             }
             Pulse.forceCalm = !i.hasExtra("charging")

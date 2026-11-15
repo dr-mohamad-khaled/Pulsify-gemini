@@ -64,12 +64,19 @@ class GlLoop(
     val nutty = NuttyScene(context)
     val bolt = BoltScene(context)
     val gloop = GloopScene(context)
+    val kitty3d = Kitty3DScene(context)
     private val creatures: List<Creature> = listOf(mochi, kalboob, kitty, kiwi, glowy, gromble, nutty, bolt, gloop)
+    private val allCreatures: List<Creature> = creatures + kitty3d
+    /** The creature this frame wants: by character id, and for Kitty by style (1.. = 3D shapes). */
+    private fun pick(): Creature? {
+        if (input.character == 3 && input.style > 0) { kitty3d.design = (input.style - 1).coerceIn(0, 2); return kitty3d }
+        return creatures.getOrNull(input.character - 1)
+    }
     /** Discoveries and bond XP from the sky and every creature. */
     var listener: SceneListener? = null
-        set(v) { field = v; scene.listener = v; creatures.forEach { it.listener = v } }
+        set(v) { field = v; scene.listener = v; allCreatures.forEach { it.listener = v } }
     /** The creature for character id 1, 2, ... (0 = sky only). */
-    private val active: Creature? get() = creatures.getOrNull(input.character - 1)?.takeIf { it in okCreatures && it === loadedCreature }
+    private val active: Creature? get() = pick()?.takeIf { it in okCreatures && it === loadedCreature }
     private val worldOn: Boolean get() = input.world >= 0 && input.video < 0 && worldState == 1
     private val video = VideoScene(context)
     val input = SceneInput()
@@ -245,6 +252,31 @@ class GlLoop(
         video.onSurfaceChanged(width, height)
     }
 
+    private var ledgeTick = 0
+    /**
+     * Widgets the 3D kitty can play with: our own placed widgets plus the ones the user marked in
+     * the kitty playground. Refreshed a few times a second (they rarely move); the page is live.
+     */
+    private fun fillLedges() {
+        val feed = buddies.feed
+        val known = feed?.pagesKnown == true
+        input.pagePos = if (known) feed!!.pagePos else 0f
+        if (ledgeTick++ % 12 != 0) return
+        val L = input.ledges
+        var n = 0
+        fun add(page: Float, l: Float, t: Float, r: Float, b: Float, id: Int) {
+            if (n >= L.size / 6 || r <= l || b <= t) return
+            val o = n * 6
+            L[o] = if (known) page else 0f; L[o + 1] = l; L[o + 2] = t; L[o + 3] = r; L[o + 4] = b; L[o + 5] = id.toFloat()
+            n++
+        }
+        if (feed != null && !feed.hidden) for (sl in feed.slots()) if (sl.placed) add(sl.page.toFloat(), sl.l, sl.t, sl.r, sl.b, sl.widgetId)
+        val u = KittyLedges.user
+        var i = 0
+        while (i + 4 < u.size) { add(u[i], u[i + 1], u[i + 2], u[i + 3], u[i + 4], 1_000_000 + i / 5); i += 5 }
+        input.ledgeCount = n
+    }
+
     /** Loads what this frame shows and releases what it no longer shows. Each part compiles on its
      *  own: a shader this GPU rejects disables only that part. */
     /**
@@ -285,7 +317,7 @@ class GlLoop(
         if (wantWorld && worldState == 0) {
             worldState = if (safeInit("world") { world.onSurfaceCreated(); if (rw > 0) world.onSurfaceChanged(rw, rh) }) 1 else -1
         } else if (!wantWorld && worldState == 1) { world.release(); worldState = 0 }
-        val want = if (input.video >= 0 || !showMainCreature) null else creatures.getOrNull(input.character - 1)
+        val want = if (input.video >= 0 || !showMainCreature) null else pick()
         if (want !== loadedCreature) {
             loadedCreature?.let { if (it in okCreatures) { it.release(); okCreatures.remove(it) } }
             loadedCreature = want
@@ -356,7 +388,7 @@ class GlLoop(
     fun longPress(nx: Float, ny: Float) = postSafe {
         if (active?.longPressAt(nx, ny) != true) { if (worldOn) world.touch(nx, ny) else if (skyOk) scene.longPressAt(nx, ny) }
     }
-    fun setBottomInset(f: Float) = postSafe { creatures.forEach { it.bottomInset = f } }
+    fun setBottomInset(f: Float) = postSafe { allCreatures.forEach { it.bottomInset = f } }
     fun perform(trick: String) = postSafe { active?.perform(trick) }
     fun greet() = postSafe { if (skyOk) scene.greet(); active?.greet() }
 
@@ -460,6 +492,7 @@ class GlLoop(
             GLES20.glClearColor(0f, 0f, 0f, 1f); GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         }
         if (showMainCreature) active?.let { c ->
+            if (c === kitty3d) { fillLedges(); kitty3d.viewLag = lag }
             c.setGround(if (worldOn) world.groundY else Float.NaN); c.update(dt, input)
             swipePhysics(dt, c)
             val vw = if (offscreen) fbW else surfW; val vh = if (offscreen) fbH else surfH

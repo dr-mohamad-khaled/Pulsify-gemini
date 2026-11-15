@@ -366,6 +366,13 @@ private fun LookPanel(state: AppState) {
     val c = LocalPulse.current
     val info = app.pulsify.engine.creatureInfo(state.character)
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+        if (info != null && info.styles.isNotEmpty()) {
+            PanelTitle("Style", info.styles.getOrNull(state.style) ?: "")
+            LazyRow(contentPadding = PaddingValues(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(info.styles) { i, name -> Pill(name, i == state.style) { state.applyStyle(i) } }
+            }
+            Gap(10.dp)
+        }
         if (info != null) {
             PanelTitle(when (info.id) { 4 -> "Species"; 5 -> "Fish"; 8 -> "Paint job"; 9 -> "How many"; else -> "Coat" }, info.coats.getOrNull(state.coat)?.name ?: "")
             OrbRow(info.coats.map { Color(it.base) to Color(it.rim) }, state.coat) { state.applyCoat(it) }

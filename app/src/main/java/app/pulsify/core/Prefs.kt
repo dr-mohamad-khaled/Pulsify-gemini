@@ -32,6 +32,11 @@ class Prefs(context: Context) {
         get() = sp.getInt(K_COAT + "_" + character, 0)
         set(v) = sp.edit().putInt(K_COAT + "_" + character, v).apply()
 
+    /** Each creature remembers its own look (Kitty: 0 = 2D, 1..3 = 3D body shapes). */
+    var style: Int
+        get() = sp.getInt(K_STYLE + "_" + character, 0)
+        set(v) = sp.edit().putInt(K_STYLE + "_" + character, v).apply()
+
     /** Each creature remembers its own environment (index into its env list). */
     var env: Int
         get() = sp.getInt(K_ENV + "_" + character, 0)
@@ -105,6 +110,7 @@ class Prefs(context: Context) {
         const val K_VIDEO = "video"
         const val K_COAT = "coat"
         const val K_ENV = "env"
+        const val K_STYLE = "style"
         const val K_VARIANT = "variant"
         const val K_ACCENT = "accent"
         const val K_BRIGHT = "brightness"

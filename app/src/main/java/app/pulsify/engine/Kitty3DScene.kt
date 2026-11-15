@@ -33,7 +33,10 @@ object KittyLedges {
 class Kitty3DScene(private val context: Context) : Creature {
 
     override var listener: SceneListener? = null
-    var design = 0
+    /** Body shape: 0 Explorer, 1 Dumpling, 2 Slim. Swapped on the GL thread in [update]. */
+    @Volatile var design = 0
+    /** The render loop shifts the whole creature by this fraction of the width while pages swipe. */
+    var viewLag = 0f
 
     private val kit = Kit3D(context)
     private val pose = KitPose()
@@ -42,7 +45,7 @@ class Kitty3DScene(private val context: Context) : Creature {
     private enum class Act {
         NONE, LOOK, GROOM, STRETCH, SPIN, WAVE, POUNCE_BUG, HOP_PLAY, WALK, CHASE, POUNCE, BOOP, PURR, CARRY, FALL,
         TUMBLE, DIZZY, STUMBLE, NOTICE_CABLE, PLAY_CABLE, SLEEP, STARTLE, DANCE, YAWN, PERCH_JUMP, PERCHED, JUMP_DOWN,
-        PEEK, REACH, PUSH, WIGGLE
+        PEEK, REACH, WIGGLE, HANG_JUMP, HANG, CLING, ZOOM, BELLY
     }
 
     private var w = 1; private var h = 1
@@ -105,6 +108,14 @@ class Kitty3DScene(private val context: Context) : Creature {
     private val ledges = ArrayList<Ledge>()
     private var ledgeTarget = -1
     private var peekSide = 1f
+    private var hangOn = -1                    // ledge id she hangs under by her front paws, or -1
+    private var hangDx = 0f
+    private var lastLedgeX = Float.NaN         // to feel the page moving under her
+    private var clingSide = 1f                 // which screen edge she clings to
+    private var zoomLaps = 0
+    private var stroke = 0f                    // how much she has been rubbed while purring
+    private var lastMX = 0f; private var lastMY = 0f
+    private val sSink = Spring(); private val sRoll = Spring()   // body lowered / rolled (belly flop, cling lean)
 
     // Little effects.
     private class P(var kind: Float, var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Float, var max: Float,
@@ -167,6 +178,8 @@ class Kitty3DScene(private val context: Context) : Creature {
     private val reported = HashSet<String>()
 
     private fun start(a: Act, dur: Float = 0f) {
+        if (a != Act.HANG) hangOn = -1
+        if (a != Act.BELLY && a != Act.PURR) stroke = 0f
         lastAct = act; act = a; actT = 0f; actDur = dur
     }
 
@@ -204,7 +217,7 @@ class Kitty3DScene(private val context: Context) : Creature {
     override fun touchDown(nx: Float, ny: Float): Boolean {
         val (ux, uy) = toUv(nx, ny)
         sinceTouch = 0f; touching = true; moved = false; longFired = false; downAt = time
-        tX = ux; tY = uy; t0X = ux; t0Y = uy
+        tX = ux; tY = uy; t0X = ux; t0Y = uy; lastMX = ux; lastMY = uy
         downOnCat = onCat(ux, uy)
         lookAt(ux, uy)
         if (act == Act.SLEEP && downOnCat) wake()
@@ -216,8 +229,16 @@ class Kitty3DScene(private val context: Context) : Creature {
         val (ux, uy) = toUv(nx, ny)
         sinceTouch = 0f
         if (hypot(ux - t0X, uy - t0Y) > 0.035f) moved = true
+        val mdx = ux - lastMX; val mdy = uy - lastMY
+        lastMX = ux; lastMY = uy
         tX = ux; tY = uy
         lookAt(ux, uy)
+        if (downOnCat && (act == Act.PURR || act == Act.BELLY)) {
+            // Rubbing her while she purrs: she melts and flops over for belly rubs.
+            stroke += hypot(mdx, mdy)
+            if (act == Act.PURR && stroke > size * 0.6f) { start(Act.BELLY); stroke = size; discover("belly") }
+            return true
+        }
         if (moved && downOnCat && act != Act.CARRY && act != Act.SLEEP) {
             // Picked up by the scruff.
             grabDx = x - ux; grabDy = y - uy
@@ -233,6 +254,7 @@ class Kitty3DScene(private val context: Context) : Creature {
         touching = false; sinceTouch = 0f
         val tap = !moved && time - downAt < 0.35f
         if (act == Act.PURR) { start(Act.NONE); sGlow.target = 0f }
+        if (act == Act.BELLY) actDur = actT + 1.6f        // stays on her back a moment, then rolls up
         if (act == Act.CARRY) { start(Act.FALL); vx = (tX - t0X).coerceIn(-0.5f, 0.5f); vy = 0.15f * size; grounded = false; onLedge = -1 }
         else if (act == Act.CHASE) pounceAt(tX)
         if (tap) { if (downOnCat) boop() else pounceAt(tX) }
@@ -261,7 +283,8 @@ class Kitty3DScene(private val context: Context) : Creature {
         if (!grounded) return
         if (fast) {
             start(Act.TUMBLE, 1.1f); discover("tumble")
-            jump(x - dir * size * 0.7f, y, size * 0.35f)
+            // flung against the page's motion; near an edge she slams into it and clings
+            jump(x - dir * size * 1.1f, y, size * 0.35f)
             rollV = -dir * 2f * PI.toFloat() / 0.75f
         } else {
             start(Act.STUMBLE, 1.2f)
@@ -273,7 +296,9 @@ class Kitty3DScene(private val context: Context) : Creature {
         sinceTouch = 0f
         when (trick) {
             "pounce" -> pounceAt(x + (if (Random.nextBoolean()) 1 else -1) * size * 0.6f)
-            "zoomies" -> start(Act.SPIN, 1.6f)
+            "zoomies" -> zoomies()
+            "chase", "tail" -> start(Act.SPIN, 1.6f)
+            "belly" -> { start(Act.BELLY, 3f) }
             "purr" -> start(Act.PURR, 3f)
             "groom" -> start(Act.GROOM, 3f)
             "loaf", "box" -> start(Act.SLEEP, 6f)
@@ -290,10 +315,20 @@ class Kitty3DScene(private val context: Context) : Creature {
         if (time - lastTap < 0.6f) taps++ else taps = 1
         lastTap = time
         if (act == Act.SLEEP) { wake(); return }
-        if (taps >= 3) { taps = 0; start(Act.SPIN, 1.4f); discover("zoomies"); return }
+        if (act == Act.HANG) { start(Act.FALL); vy = 0f; return }          // a boop makes her let go
+        if (taps >= 3) { taps = 0; zoomies(); return }
         start(Act.BOOP, 0.7f)
         sSqY.vel -= 5f; sSqX.vel += 3f
         burst(2f, 3, headX, headY + size * 0.2f, 1f, 0.45f, 0.6f)
+    }
+
+    private fun zoomies() {
+        if (act == Act.CARRY || act == Act.HANG || onLedge >= 0 || !grounded) { start(Act.SPIN, 1.4f); return }
+        zoomLaps = 3 + Random.nextInt(2)
+        targetX = if (x > 0f) -halfW + size * 0.35f else halfW - size * 0.35f
+        hopT = 1f
+        start(Act.ZOOM); discover("zoomies")
+        burst(9f, 3, x, y + size * 0.5f, 1f, 0.95f, 0.6f)
     }
 
     private fun pounceAt(ux: Float) {
@@ -312,6 +347,7 @@ class Kitty3DScene(private val context: Context) : Creature {
 
     override fun update(dt: Float, input: SceneInput) {
         time += dt; actT += dt; sinceTouch += dt
+        kit.load(design)                                   // no-op unless the body shape changed
         mood = input.mood
         musicOn = input.audio.source != AudioFrame.Source.NONE && input.audio.level > 0.02f
         palette(input, dt)
@@ -353,11 +389,13 @@ class Kitty3DScene(private val context: Context) : Creature {
         while (ledges.size < n) ledges += Ledge()
         while (ledges.size > n) ledges.removeAt(ledges.size - 1)
         val m = min(w, h).toFloat()
+        // widgets stay put on the glass while the render loop slides her with the pages: undo that slide
+        val lagUv = viewLag * w / m
         for (i in 0 until n) {
             val o = i * 6
             val page = input.ledges[o]; val dx = page - input.pagePos
             val L = ledges[i]
-            L.l = (input.ledges[o + 1] + dx - 0.5f) * w / m; L.r = (input.ledges[o + 3] + dx - 0.5f) * w / m
+            L.l = (input.ledges[o + 1] + dx - 0.5f) * w / m - lagUv; L.r = (input.ledges[o + 3] + dx - 0.5f) * w / m - lagUv
             L.t = (0.5f - input.ledges[o + 2]) * h / m; L.b = (0.5f - input.ledges[o + 4]) * h / m
             L.id = input.ledges[o + 5].toInt()
         }
@@ -491,7 +529,7 @@ class Kitty3DScene(private val context: Context) : Creature {
             Act.PERCH_JUMP -> {
                 if (grounded) {
                     val L = ledgeById(ledgeTarget)
-                    if (L != null && abs(y - L.t) < 0.02f) { onLedge = L.id; ledgeDx = x - L.l; start(Act.PERCHED, 5f + Random.nextFloat() * 5f); discover("perch") }
+                    if (L != null && abs(y - L.t) < 0.02f) { onLedge = L.id; ledgeDx = x - L.l; lastLedgeX = Float.NaN; start(Act.PERCHED, 5f + Random.nextFloat() * 5f); discover("perch") }
                     else start(Act.NONE)
                 }
             }
@@ -500,14 +538,63 @@ class Kitty3DScene(private val context: Context) : Creature {
                 if (L == null) { fallOff(); return }
                 if (!visible(L)) { fallOff(); return }
                 if (actT > actDur && !touching) {
+                    val next = ledges.filter { it.id != L.id && visible(it) && abs(it.t - L.t) < size * 1.5f &&
+                        it.t < halfH - size * 1.05f && it.r - it.l > size * 0.7f &&
+                        min(abs(it.l - x), abs(it.r - x)) < size * 2.6f }
+                    if (next.isNotEmpty() && Random.nextFloat() < 0.55f) {
+                        // leap to the next widget
+                        val N = next.random(); ledgeTarget = N.id
+                        start(Act.PERCH_JUMP); jump(x.coerceIn(N.l + size * 0.3f, N.r - size * 0.3f), N.t, size * 0.3f)
+                        discover("widget hop"); return
+                    }
                     // hop down to the floor
                     start(Act.JUMP_DOWN)
                     val tx = (x + (if (x > 0f) -1 else 1) * size * 0.4f).coerceIn(-halfW + size * 0.35f, halfW - size * 0.35f)
                     jump(tx, floorY, size * 0.2f)
-                } else if (Random.nextFloat() < dt * 0.4f) { lookAt(x + (Random.nextFloat() - 0.5f) * 1.5f, y - size) }
+                } else {
+                    if (Random.nextFloat() < dt * 0.4f) lookAt(x + (Random.nextFloat() - 0.5f) * 1.5f, y - size)
+                    // the page sliding under her makes her wobble for balance
+                    if (!lastLedgeX.isNaN()) sRoll.vel -= (L.l - lastLedgeX) * 5f
+                    lastLedgeX = L.l
+                }
             }
             Act.JUMP_DOWN -> if (grounded) { start(Act.LOOK, 0.6f) }
-            Act.PEEK, Act.REACH, Act.PUSH -> if (actT > actDur) start(Act.NONE)
+            Act.PEEK, Act.REACH -> if (actT > actDur) start(Act.NONE)
+            Act.HANG_JUMP -> if (grounded) start(Act.LOOK, 0.6f)          // missed the edge
+            Act.HANG -> {
+                val L = ledgeById(hangOn)
+                if (L == null || !visible(L)) { letGo(true); return }
+                // little pull-ups and kicks, and a swing when the page moves
+                if (Random.nextFloat() < dt * 0.8f) { sSqY.vel += 4f; sLegL.vel -= 6f; sLegR.vel -= 6f }
+                if (!lastLedgeX.isNaN()) sRoll.vel -= (L.l - lastLedgeX) * 8f
+                lastLedgeX = L.l
+                if (actT > actDur && !touching) letGo(false)
+            }
+            Act.CLING -> {
+                if (Random.nextFloat() < dt * 5f) burst(9f, 1, x + clingSide * size * 0.3f, y + size * 0.7f, 1f, 1f, 1f, 0.3f, 0.018f)
+                if (grounded) { start(Act.DIZZY, 1.3f) }
+            }
+            Act.ZOOM -> {
+                val d = targetX - x
+                if (abs(d) < size * 0.12f && grounded) {
+                    zoomLaps--
+                    if (zoomLaps <= 0) { start(Act.DIZZY, 1.2f); return }
+                    targetX = -targetX                                            // skid and turn around
+                    sSqY.vel -= 4f; sPitch.vel -= 3f
+                    burst(9f, 2, x, y + size * 0.1f, 1f, 1f, 1f, 0.5f, 0.022f)
+                }
+                facing = sign(targetX - x)
+                hopT += dt
+                if (grounded && hopT > 0.14f) { hopT = 0f; jump(x + sign(d) * min(abs(d), size * 0.6f), floorY, size * 0.1f) }
+                if (Random.nextFloat() < dt * 10f) float1(9f, x - facing * size * 0.35f, y + size * (0.2f + Random.nextFloat() * 0.4f), 1f, 0.95f, 0.65f, 0.02f, 0.5f)
+                if (actT > 8f) start(Act.DIZZY, 1f)
+            }
+            Act.BELLY -> {
+                if (Random.nextFloat() < dt * 2.5f) float1(2f, x + (Random.nextFloat() - 0.5f) * size * 0.6f, y + size * 0.45f, 1f, 0.45f, 0.62f, 0.032f)
+                if (touching) actDur = max(actDur, actT + 0.5f)
+                if (actDur > 0f && actT > actDur && !touching) { start(Act.LOOK, 0.8f); sSqY.vel -= 5f }
+                if (!touching && actDur == 0f) actDur = actT + 1.6f
+            }
             Act.SPIN -> {
                 spin += dt * 9f * (1f - actT / max(actDur, 0.1f)).coerceAtLeast(0.25f)
                 if (grounded && actT < actDur - 0.2f && (actT * 3f) % 1f < dt * 3f) jump(x, floorY, size * 0.07f)
@@ -525,6 +612,11 @@ class Kitty3DScene(private val context: Context) : Creature {
     private var nextAfterWalk = Act.NONE
     private var lastFallHeight = 0f
     private var fallStartY = -99f
+
+    private fun letGo(whoops: Boolean) {
+        hangOn = -1; vy = 0f; vx = 0f; grounded = false
+        start(Act.FALL); if (whoops) discover("whoops")
+    }
 
     private fun fallOff() {
         onLedge = -1; grounded = false; vy = size * 0.2f; vx = 0f
@@ -555,7 +647,7 @@ class Kitty3DScene(private val context: Context) : Creature {
 
     private fun playWithWidget(L: Ledge) {
         ledgeTarget = L.id
-        val r = Random.nextFloat()
+        val r = Random.nextFloat() * 1.0f
         val cx = (L.l + L.r) / 2f
         when {
             // Jump up and sit on top of it.
@@ -563,8 +655,14 @@ class Kitty3DScene(private val context: Context) : Creature {
                 val tx = (x.coerceIn(L.l + size * 0.3f, L.r - size * 0.3f))
                 start(Act.PERCH_JUMP); jump(tx, L.t, size * 0.3f)
             }
+            // Leap up and hang from its bottom edge, back legs dangling.
+            r < 0.7f && L.b - floorY > size * (HANG_REACH + 0.2f) && L.b - floorY < size * (HANG_REACH + 1.3f) -> {
+                val tx = x.coerceIn(L.l + size * 0.3f, L.r - size * 0.3f)
+                start(Act.HANG_JUMP)
+                jump(tx, floorY, (L.b - size * HANG_REACH) - floorY)
+            }
             // Sit under it and paw at its bottom edge.
-            r < 0.75f && L.b > floorY + size * 0.95f && L.b < floorY + size * 1.6f -> {
+            r < 0.85f && L.b > floorY + size * 0.95f && L.b < floorY + size * 1.6f -> {
                 targetX = x.coerceIn(L.l + size * 0.2f, L.r - size * 0.2f)
                 nextAfterWalk = Act.REACH
                 if (abs(targetX - x) > 0.02f) start(Act.WALK) else start(Act.REACH, 2.5f)
@@ -582,6 +680,17 @@ class Kitty3DScene(private val context: Context) : Creature {
 
     private fun physics(dt: Float) {
         if (act == Act.CARRY) return
+        if (hangOn >= 0) {
+            val L = ledgeById(hangOn)
+            if (L != null) { x = L.l + hangDx; y = L.b - size * HANG_REACH }
+            return
+        }
+        if (act == Act.CLING) {
+            // sliding slowly down the edge of the screen, claws squeaking
+            y -= size * 0.32f * dt; vx = 0f; vy = 0f
+            if (y <= floorY) { y = floorY; fallStartY = y; land() }
+            return
+        }
         // Riding a ledge: it moves with the home-screen page.
         if (onLedge >= 0) {
             val L = ledgeById(onLedge)
@@ -593,22 +702,44 @@ class Kitty3DScene(private val context: Context) : Creature {
         }
         if (!grounded) {
             if (fallStartY < y) fallStartY = y
+            val prevVy = vy
             vy -= GRAV * size * dt
             x += vx * dt; y += vy * dt
+            // at the top of a hang jump: catch the widget's bottom edge
+            if (act == Act.HANG_JUMP && prevVy > 0f && vy <= 0f) {
+                val L = ledgeById(ledgeTarget)
+                if (L != null && visible(L) && x > L.l + size * 0.15f && x < L.r - size * 0.15f) {
+                    start(Act.HANG, 3.5f + Random.nextFloat() * 3f)
+                    hangOn = L.id; hangDx = x - L.l; lastLedgeX = Float.NaN
+                    vx = 0f; vy = 0f; y = L.b - size * HANG_REACH
+                    sSqY.vel += 5f; discover("hang")
+                    return
+                }
+            }
             roll += rollV * dt
             // land on a ledge top when falling through it
             if (vy < 0f) for (L in ledges) {
                 if (x > L.l + size * 0.12f && x < L.r - size * 0.12f && y <= L.t && y - vy * dt >= L.t - 0.002f && visible(L)
                     && (act == Act.PERCH_JUMP || act == Act.FALL || act == Act.CARRY)) {
                     y = L.t; land(); onLedge = L.id; ledgeDx = x - L.l
+                    lastLedgeX = Float.NaN
                     if (act != Act.PERCH_JUMP) start(Act.PERCHED, 6f)
                     return
                 }
             }
             if (y <= floorY) { y = floorY; land() }
-            x = x.coerceIn(-halfW + size * 0.3f, halfW - size * 0.3f)
+            val wall = halfW - size * 0.3f
+            if (abs(x) > wall && act == Act.TUMBLE && y > floorY + size * 0.15f) {
+                // slammed into the edge of the screen: grab on
+                clingSide = sign(x); x = clingSide * wall
+                roll = 0f; rollV = 0f; facing = clingSide
+                start(Act.CLING); discover("cling")
+                sSqX.vel -= 6f
+                return
+            }
+            x = x.coerceIn(-wall, wall)
         } else {
-            if (abs(vx) > 0f && act != Act.WALK && act != Act.CHASE) { x += vx * dt; vx *= exp(-6f * dt); if (abs(vx) < 0.005f) vx = 0f }
+            if (abs(vx) > 0f && act != Act.WALK && act != Act.CHASE && act != Act.ZOOM) { x += vx * dt; vx *= exp(-6f * dt); if (abs(vx) < 0.005f) vx = 0f }
             x = x.coerceIn(-halfW + size * 0.3f, halfW - size * 0.3f)
             if (abs(y - floorY) > 0.001f && onLedge < 0) { grounded = false; vy = 0f }
         }
@@ -618,7 +749,7 @@ class Kitty3DScene(private val context: Context) : Creature {
         lastFallHeight = fallStartY - y; fallStartY = -99f
         val hard = min(1f, lastFallHeight / size)
         grounded = true; vy = 0f
-        if (act != Act.WALK && act != Act.CHASE) vx *= 0.3f
+        if (act != Act.WALK && act != Act.CHASE && act != Act.ZOOM) vx *= 0.3f
         sSqY.vel -= 3f + hard * 7f; sSqX.vel += 2f + hard * 4f
         roll = 0f; rollV = 0f
         if (hard > 0.6f) burst(9f, 3, x, y + size * 0.05f, 1f, 1f, 1f, 0.6f, 0.025f)
@@ -644,7 +775,8 @@ class Kitty3DScene(private val context: Context) : Creature {
 
         // defaults (a sitting, breathing, curious cat)
         val breathe = sin(t * 2.1f) * 0.012f
-        var yawT = facing * 0.75f * (if (grounded && act != Act.WALK && act != Act.CHASE) 0.45f else 1f)
+        var yawT = facing * 0.75f * (if (grounded && act != Act.WALK && act != Act.CHASE && act != Act.ZOOM) 0.45f else 1f)
+        var sink = 0f; var rollT = 0f
         var pitchT = 0f
         var sqY = 1f + breathe; var sqX = 1f - breathe * 0.5f
         var hy = lookX * 0.55f - yawT * 0.5f; var hp = lookY * 0.35f; var ht = sin(t * 0.7f) * 0.05f
@@ -656,7 +788,7 @@ class Kitty3DScene(private val context: Context) : Creature {
         var eyeS = 1f
         var glow = 0f
 
-        if (!grounded && act != Act.CARRY) {
+        if (!grounded && act != Act.CARRY && act != Act.HANG && act != Act.CLING) {
             // airborne: tuck or stretch depending on rising/falling
             val up = (vy / (size * 2.5f)).coerceIn(-1f, 1f)
             legL = 0.5f + up * 0.5f; legR = legL; sprL = 0.25f; sprR = 0.25f
@@ -741,7 +873,38 @@ class Kitty3DScene(private val context: Context) : Creature {
                 hy = -peekSide * 0.5f * k; ht = -peekSide * 0.35f * k; eyeS = 1.12f
                 if (actT > actDur * 0.5f && actT - dt <= actDur * 0.5f) float1(2f, headX - peekSide * size * 0.3f, headY + size * 0.3f, 1f, 0.45f, 0.6f, 0.03f)
             }
-            Act.PUSH -> { pitchT = 0.3f; legR = 1.5f; legL = 1.5f }
+            Act.HANG_JUMP -> { legL = 2.4f; legR = 2.4f; sprL = 0.15f; sprR = 0.15f; eyeS = 1.15f; earL = 0.3f; earR = 0.3f; hp = 0.45f; yawT = 0f }
+            Act.HANG -> {
+                // front paws over her head on the edge, body stretched, tail swinging for balance
+                legL = 2.95f + sin(t * 3f) * 0.05f; legR = 2.95f + sin(t * 3f + 1.5f) * 0.05f; sprL = 0.12f; sprR = 0.12f
+                sqY = 1.1f + sin(t * 2.2f) * 0.015f; sqX = 0.94f
+                hp = 0.15f + lookY * 0.2f; eyeS = 1.12f; earL = 0.15f; earR = 0.15f
+                curl = -0.6f; drp = -0.4f; wag = 0.5f; tailSpeed = 3f
+                yawT = 0f; rollT = sin(t * 2.4f) * 0.06f
+                if (actT > actDur - 0.6f) { shut = 0f; eyeS = 1.2f; earL = -0.3f; earR = -0.3f }     // about to let go
+            }
+            Act.CLING -> {
+                // spread-eagled against the screen edge, looking at you like it's your fault
+                legL = 2.5f; legR = 2.2f; sprL = 0.5f; sprR = 0.5f
+                yawT = clingSide * 1.1f; hy = -clingSide * 0.75f; hp = 0.1f; ht = -clingSide * 0.15f
+                eyeS = 1.22f; earL = -0.55f; earR = -0.55f; droop = 0.4f; curl = 1.3f; wag = 0.25f; tailSpeed = 7f
+                rollT = -clingSide * 0.18f; sqY = 1.06f; sqX = 0.95f
+            }
+            Act.ZOOM -> {
+                pitchT = 0.28f; earL = -0.45f; earR = -0.45f; eyeS = 1.22f; curl = 0.05f; wag = 0.15f; tailSpeed = 11f
+                hy = 0f; hp = 0.1f; droop = 0.2f; sqY -= 0.04f
+                legL = 0.9f + sin(t * 26f) * 0.7f; legR = 0.9f + sin(t * 26f + 3.1f) * 0.7f
+            }
+            Act.BELLY -> {
+                // flopped on her side, paws up and kneading the air, blissed out
+                val k = min(1f, actT * 3f)
+                val side = if (facing == 0f) 1f else facing
+                rollT = side * 1.35f * k; sink = -0.2f * k
+                legL = (1.7f + sin(t * 5f) * 0.35f) * k; legR = (1.7f + sin(t * 5f + 2f) * 0.35f) * k; sprL = 0.35f * k; sprR = 0.35f * k
+                shut = 0.85f; glow = 0.75f; hp = 0.25f; ht = side * 0.25f; hy = 0f; yawT = 0f
+                curl = 0.4f + sin(t * 1.2f) * 0.15f; wag = 0.25f; tailSpeed = 1.5f; earL = -0.2f; earR = -0.2f
+                sqY = 1f + sin(t * 1.6f) * 0.02f
+            }
             else -> {}
         }
 
@@ -759,6 +922,12 @@ class Kitty3DScene(private val context: Context) : Creature {
         sLegL.step(legL, 260f, 14f, dt); sLegR.step(legR, 260f, 14f, dt); sSprL.step(sprL, 200f, 14f, dt); sSprR.step(sprR, 200f, 14f, dt)
         sCurl.step(curl, 60f, 7f, dt); sWag.step(wag, 40f, 8f, dt); sDrp.step(drp, 50f, 8f, dt)
         sEye.step(eyeS, 260f, 12f, dt); sGlow.step(glow, 40f, 9f, dt); sDim.step(sDim.target, 30f, 9f, dt)
+        sSink.step(sink, 90f, 12f, dt); sRoll.step(rollT, 70f, 7f, dt)
+        if (act != Act.SPIN && abs(spin) > 0.01f) {
+            // an interrupted tail chase: drop the whole turns (invisible) and let the spring settle the rest
+            val turns = Math.round(spin / (2f * PI.toFloat())) * 2f * PI.toFloat()
+            sYaw.v -= turns; spin = 0f
+        }
         tailPhase += dt * tailSpeed
 
         // random ear twitches
@@ -803,8 +972,8 @@ class Kitty3DScene(private val context: Context) : Creature {
         if (onLedge < 0) kit.quad(1f, x, floorY + 0.004f, size * 0.42f * (1f - air * 0.3f), size * 0.07f, 0f, 0f, 0f, 0f, 1f - min(0.8f, air * 0.6f))
         else ledgeById(onLedge)?.let { kit.quad(1f, x, it.t + 0.004f, size * 0.38f, size * 0.06f, 0f, 0f, 0f, 0f, 0.8f) }
         // the cat (box centre sits half a height above the feet)
-        val cy = y + (kit.boxCz - kit.floorZ) * k
-        kit.sprite(x, cy, boxHalf, roll, 1f)
+        val cy = y + (kit.boxCz - kit.floorZ) * k + sSink.v * size
+        kit.sprite(x, cy, boxHalf, roll + sRoll.v, 1f)
         // effects in front
         for (p in parts) {
             val a = (min(1f, p.life * 6f) * min(1f, (p.max - p.life) * 2.5f)).coerceIn(0f, 1f)
@@ -854,5 +1023,9 @@ class Kitty3DScene(private val context: Context) : Creature {
         }
     }
 
-    companion object { const val GRAV = 9f }
+    companion object {
+        const val GRAV = 9f
+        /** Feet-to-raised-paws height, in cat heights: where the edge is when she hangs. */
+        const val HANG_REACH = 1.12f
+    }
 }
