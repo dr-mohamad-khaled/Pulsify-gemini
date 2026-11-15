@@ -227,11 +227,14 @@ class Kit3D(private val context: Context) {
         var points = 0f
     }
 
+    private val saveVp = IntArray(4)
+
     /** Renders the posed cat into the sprite texture if anything changed. */
     fun render(p: KitPose, pal: Palette, force: Boolean = false) {
         if (loaded < 0 || fbo == 0) return
         if (!dirty && !force && !p.changed()) return
         pose(p); camera()
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, saveVp, 0)       // the caller's viewport, restored below
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo)
         GLES20.glViewport(0, 0, spriteSize, spriteSize)
         GLES20.glClearColor(0f, 0f, 0f, 0f)
@@ -271,6 +274,7 @@ class Kit3D(private val context: Context) {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, Gl.target)
+        GLES20.glViewport(saveVp[0], saveVp[1], saveVp[2], saveVp[3])
         p.markDrawn(); dirty = false
     }
 
