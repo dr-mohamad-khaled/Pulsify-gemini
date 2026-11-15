@@ -132,8 +132,23 @@ class BoltScene(context: Context) : CanvasCreature(context) {
         }
     }
 
+    // Charging: the face shows the battery filling for a few seconds, then Bolt carries on with
+    // his day and peeks at the level again now and then.
+    private var wasCharging = false
+    private var chargeShowT = 0f
+    private var nextChargePeek = 20f
+
     override fun step(dt: Float) {
         actT += dt; msgT -= dt; faceT -= dt
+        chargeShowT -= dt
+        if (charging && !wasCharging) { chargeShowT = 4f; nextChargePeek = 18f + Random.nextFloat() * 12f; msg = "charging!"; msgT = 1.2f }
+        if (!charging && wasCharging) { chargeShowT = 0f; msg = "unplugged"; msgT = 1f }
+        wasCharging = charging
+        if (charging) {
+            nextChargePeek -= dt
+            if (nextChargePeek <= 0f && act == Act.NONE) { chargeShowT = 2.4f; nextChargePeek = 18f + Random.nextFloat() * 14f }
+        }
+        val showingCharge = charging && chargeShowT > 0f
         val slow = if (lowBattery) 0.35f else 1f
         val asleep = night && act == Act.NONE && sinceTouch > 8f && !musicOn
         sleeping = asleep
@@ -142,11 +157,11 @@ class BoltScene(context: Context) : CanvasCreature(context) {
         beatK = max(0f, beatK - dt * 3f)
 
         // Rolling: a damped spring toward the target with a little lean.
-        if (!asleep && act == Act.NONE && !charging) {
+        if (!asleep && act == Act.NONE && !showingCharge) {
             nextRoam -= dt
             if (nextRoam < 0f) { tx = (homeX + (Random.nextFloat() - 0.5f) * W * 0.55f).coerceIn(u * 1.3f, W - u * 1.3f); nextRoam = 3f + Random.nextFloat() * 4f }
         }
-        if (charging) tx = max(W * 0.55f, u * 3f)
+        if (showingCharge) tx = x                         // stands still while he checks his battery
         if (act == Act.SCAN) tx = (scanX - sign(scanX - x + 0.01f) * u * 2.6f).coerceIn(u * 1.2f, W - u * 1.2f)
         val k = 6f * slow
         vx += ((tx - x) * k * k * 0.12f - vx * k * 0.9f) * dt
@@ -203,19 +218,13 @@ class BoltScene(context: Context) : CanvasCreature(context) {
         if (sleeping) t = 0.08f
         val cy = floor - u * 1.35f + bob - jumpY
 
-        // Charging: the cable goes to a socket at the left edge, pulses run along it.
+        // Charging: little sparks drift up from his chest battery (no cable).
         if (charging) {
-            val sx = u * 0.6f; val sy = floor - u * 0.9f
-            ink.color(0xFF1B1F2B.toInt()); ink.r.set(sx - u * 0.25f, sy - u * 0.35f, sx + u * 0.25f, sy + u * 0.35f); c.drawRoundRect(ink.r, u * 0.1f, u * 0.1f, ink.p)
-            c.drawRect(sx - u * 0.1f, sy - u * 0.15f, sx - u * 0.05f, sy - u * 0.03f, ink.color(0xFF05060A.toInt()))
-            c.drawRect(sx + u * 0.05f, sy - u * 0.15f, sx + u * 0.1f, sy - u * 0.03f, ink.p)
-            ink.path.reset(); ink.path.moveTo(sx + u * 0.1f, sy)
-            ink.path.cubicTo(sx + u * 1.2f, floor + u * 0.1f, x - u * 1.6f, floor + u * 0.1f, x - u * 0.45f, cy + u * 0.45f)
-            c.drawPath(ink.path, ink.stroke(0xFF2B2F3D.toInt(), u * 0.08f))
             for (i in 0 until 3) {
-                val k = (time * 0.7f + i / 3f) % 1f
-                val bx = lerpF(sx, x - u * 0.45f, k); val by = lerpF(sy, cy + u * 0.45f, k) + sin(k * PI.toFloat()) * u * 0.9f
-                ink.glow(c, bx, by, u * 0.2f, u * 0.2f, 0xFF7CFFB0.toInt(), 0.6f); ink.ell(c, bx, by, u * 0.06f, u * 0.06f, 0xFF7CFFB0.toInt())
+                val k = (time * 0.5f + i / 3f) % 1f
+                val bx = x + sin(time * 2f + i * 2.1f) * u * 0.35f; val by = cy + u * 0.2f - k * u * 1.6f
+                val a = sin(k * PI.toFloat())
+                ink.glow(c, bx, by, u * 0.16f, u * 0.16f, 0xFF7CFFB0.toInt(), 0.5f * a); ink.boltShape(c, bx, by, u * 0.06f, 0xFF7CFFB0.toInt(), a)
             }
         }
         // Laser scan of your finger.
@@ -331,9 +340,15 @@ class BoltScene(context: Context) : CanvasCreature(context) {
                 val bxp = abs(((time * 0.35f) % 2f) - 1f) * w2; val byp = abs(((time * 0.27f) % 2f) - 1f) * h2
                 ink.text(c, "zZ", sx0 + u * 0.22f + bxp, sy0 + u * 0.24f + byp, u * 0.2f, android.graphics.Color.HSVToColor(floatArrayOf((time * 60f) % 360f, 0.6f, 1f)))
             }
-            charging && act == Act.NONE -> {
-                ink.text(c, "${(battery * 100).toInt()}%", fcx + u * 0.12f, fcy + u * 0.11f, u * 0.32f, 0xFF7CFFB0.toInt())
-                ink.boltShape(c, fcx - u * 0.42f, fcy, u * 0.13f, 0xFF7CFFB0.toInt())
+            charging && chargeShowT > 0f && act == Act.NONE -> {
+                // A battery icon filling up, with the real percentage beside it.
+                val g = 0xFF7CFFB0.toInt()
+                val bw = u * 0.42f; val bh = u * 0.24f; val bx0 = fcx - u * 0.62f; val by0 = fcy - bh / 2f
+                ink.r.set(bx0, by0, bx0 + bw, by0 + bh); c.drawRoundRect(ink.r, u * 0.04f, u * 0.04f, ink.stroke(g, u * 0.035f))
+                c.drawRect(bx0 + bw, fcy - bh * 0.22f, bx0 + bw + u * 0.04f, fcy + bh * 0.22f, ink.color(g))
+                val fill = ((battery + ((time * 0.6f) % 1f) * (1f - battery) * 0.35f)).coerceIn(0.05f, 1f)
+                c.drawRect(bx0 + u * 0.04f, by0 + u * 0.04f, bx0 + u * 0.04f + (bw - u * 0.08f) * fill, by0 + bh - u * 0.04f, ink.color(g, 0.85f))
+                ink.text(c, "${(battery * 100).toInt()}%", fcx + u * 0.2f, fcy + u * 0.11f, u * 0.28f, g)
             }
             act == Act.CLOCK -> {
                 ink.text(c, clockStr, fcx, fcy + u * 0.12f, u * 0.34f, sc)

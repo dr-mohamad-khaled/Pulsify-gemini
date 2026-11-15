@@ -28,6 +28,7 @@ class AppState {
     var coat by mutableIntStateOf(0); private set
     var env by mutableIntStateOf(0); private set
     var style by mutableIntStateOf(0); private set
+    var bgColor by mutableIntStateOf(0xFF000000.toInt()); private set
     var accent by mutableIntStateOf(0); private set
     var brightness by mutableFloatStateOf(1f); private set
     var musicReact by mutableStateOf(false); private set
@@ -58,6 +59,7 @@ class AppState {
         coat = p.coat
         env = p.env
         style = p.style
+        bgColor = p.bgColor
         accent = p.accent
         brightness = p.brightness
         musicReact = p.musicReact
@@ -73,6 +75,7 @@ class AppState {
     fun applyCoat(c: Int) { Pulse.prefs.coat = c }
     fun applyEnv(e: Int) { Pulse.prefs.env = e }
     fun applyStyle(s: Int) { Pulse.prefs.style = s }
+    fun applyBgColor(c: Int) { Pulse.prefs.bgColor = c }
 
     val displayName: String
         get() = app.pulsify.engine.videoLoop(video)?.name ?: app.pulsify.engine.creatureInfo(character)?.name ?: SKY_VARIANTS[variant.coerceIn(0, SKY_VARIANTS.size - 1)].name

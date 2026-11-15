@@ -18,6 +18,7 @@ data class Settings(
     val kiwiWords: String = "",
     val video: Int = -1,
     val style: Int = 0,
+    val bgColor: Int = 0xFF000000.toInt(),
 )
 
 /** Process-wide services shared by the app screens and the live wallpaper. */
@@ -77,6 +78,7 @@ object Pulse {
             kiwiWords = prefs.kiwiWords,
             video = prefs.video,
             style = prefs.style,
+            bgColor = prefs.bgColor,
         )
     }
 
@@ -100,6 +102,7 @@ object Pulse {
         i.video = s.video
         i.coat = s.coat
         i.style = s.style
+        i.bgColor = s.bgColor
         val info = app.pulsify.engine.creatureInfo(s.character)
         if (info != null) {
             val e = info.envs[s.env.coerceIn(0, info.envs.size - 1)]

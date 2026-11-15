@@ -6,6 +6,15 @@ data class CoatInfo(val name: String, val base: Int, val rim: Int)
 /** An environment: a painted world id, or -1 for the night-sky shader with a given variant. */
 data class EnvInfo(val name: String, val world: Int, val skyVariant: Int = 0, val c1: Int, val c2: Int)
 
+/** World id for a plain background in a colour the user picks (true black by default). */
+const val SOLID_WORLD = 100
+
+/** Background colours offered for [SOLID_WORLD]. */
+val SOLID_COLORS = listOf(
+    0xFF000000.toInt(), 0xFF0B1026.toInt(), 0xFF1A0B24.toInt(), 0xFF06201C.toInt(),
+    0xFF1F1F24.toInt(), 0xFF2A0A14.toInt(), 0xFF2B1E0A.toInt(), 0xFFF6EFE6.toInt(),
+)
+
 /** A trick the Studio can ask the creature to do right now. */
 data class TrickInfo(val id: String, val label: String, val emoji: String)
 
@@ -98,6 +107,7 @@ val GLOOP_INFO = CreatureInfo(
         EnvInfo("Gum Pool", 29, c1 = 0xFF73F2C8.toInt(), c2 = 0xFFFFC6DA.toInt()),
         EnvInfo("Moon Jelly", 30, c1 = 0xFF9D5CF2.toInt(), c2 = 0xFFFFE6FA.toInt()),
         EnvInfo("Sherbet Hills", 31, c1 = 0xFFFFB38F.toInt(), c2 = 0xFFFF9EB8.toInt()),
+        EnvInfo("Plain Colour", SOLID_WORLD, c1 = 0xFF000000.toInt(), c2 = 0xFF111111.toInt()),
     ),
     listOf(
         TrickInfo("tag", "Tag", "🏃"), TrickInfo("tower", "Jelly tower", "🗼"), TrickInfo("conga", "Conga line", "💃"),

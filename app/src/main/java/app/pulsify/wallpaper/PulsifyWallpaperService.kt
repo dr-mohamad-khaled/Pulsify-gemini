@@ -118,6 +118,7 @@ class PulsifyWallpaperService : WallpaperService() {
                 }
             } catch (t: Throwable) { app.pulsify.core.CrashLog.note("visibility: $t") }
             loop.setRunning(isVisible)
+            if (!isPreview) loop.enableFingerSwipes(true)
         }
 
         override fun onOffsetsChanged(xOffset: Float, yOffset: Float, xStep: Float, yStep: Float, xPx: Int, yPx: Int) {

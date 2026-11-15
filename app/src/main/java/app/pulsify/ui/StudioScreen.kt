@@ -445,14 +445,22 @@ private fun WorldPanel(state: AppState) {
     val info = app.pulsify.engine.creatureInfo(state.character) ?: return
     val night = isNightNow()
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+        if (info.envs.getOrNull(state.env)?.world == app.pulsify.engine.SOLID_WORLD) {
+            PanelTitle("Background", if (state.bgColor == 0xFF000000.toInt()) "True black" else "")
+            OrbRow(app.pulsify.engine.SOLID_COLORS.map { Color(it) to Color(app.pulsify.engine.SkyScene.shiftHue(it, 20f)) },
+                app.pulsify.engine.SOLID_COLORS.indexOf(state.bgColor).coerceAtLeast(0), small = true) { state.applyBgColor(app.pulsify.engine.SOLID_COLORS[it]) }
+            Gap(8.dp)
+        }
         PanelTitle("World", info.envs.getOrNull(state.env)?.name ?: "")
         Gap(4.dp)
         val ls = rememberLazyListState(initialFirstVisibleItemIndex = state.env.coerceAtLeast(0))
         LazyRow(state = ls, contentPadding = PaddingValues(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             itemsIndexed(info.envs) { i, e ->
                 Poster(
-                    if (e.world >= 0) "worlds/w${e.world}_${if (night) "night" else "day"}.jpg" else null,
-                    e.name, i == state.env, Color(e.c1), Color(e.c2), skyStyle = e.skyVariant,
+                    if (e.world >= 0 && e.world != app.pulsify.engine.SOLID_WORLD) "worlds/w${e.world}_${if (night) "night" else "day"}.jpg" else null,
+                    e.name, i == state.env,
+                    if (e.world == app.pulsify.engine.SOLID_WORLD) Color(state.bgColor) else Color(e.c1),
+                    if (e.world == app.pulsify.engine.SOLID_WORLD) Color(state.bgColor) else Color(e.c2), skyStyle = e.skyVariant,
                 ) { state.applyEnv(i) }
             }
         }

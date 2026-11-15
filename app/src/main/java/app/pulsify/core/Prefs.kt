@@ -37,6 +37,11 @@ class Prefs(context: Context) {
         get() = sp.getInt(K_STYLE + "_" + character, 0)
         set(v) = sp.edit().putInt(K_STYLE + "_" + character, v).apply()
 
+    /** Each creature's plain-colour background (used by the "Plain Colour" world). */
+    var bgColor: Int
+        get() = sp.getInt(K_BG + "_" + character, 0xFF000000.toInt())
+        set(v) = sp.edit().putInt(K_BG + "_" + character, v).apply()
+
     /** Each creature remembers its own environment (index into its env list). */
     var env: Int
         get() = sp.getInt(K_ENV + "_" + character, 0)
@@ -111,6 +116,7 @@ class Prefs(context: Context) {
         const val K_COAT = "coat"
         const val K_ENV = "env"
         const val K_STYLE = "style"
+        const val K_BG = "bg"
         const val K_VARIANT = "variant"
         const val K_ACCENT = "accent"
         const val K_BRIGHT = "brightness"

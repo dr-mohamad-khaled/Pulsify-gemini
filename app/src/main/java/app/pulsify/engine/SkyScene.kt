@@ -30,6 +30,7 @@ class SceneInput {
     var lowBattery = false
     var parallax = 0f        // -1..1 from home-screen pages
     var kiwiWords = ""       // words the user taught Kiwi, comma separated
+    var bgColor = 0xFF000000.toInt()   // background for the plain-colour world
     var style = 0            // creature look: 0 = 2D, 1.. = 3D body shapes (Kitty)
     var pagePos = 0f         // home-screen page under the screen (fractional mid-swipe)
     /** Widgets the creature may play with: page, left, top, right, bottom (screen fractions), id. */

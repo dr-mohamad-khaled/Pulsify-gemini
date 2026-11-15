@@ -77,7 +77,7 @@ class GlLoop(
         set(v) { field = v; scene.listener = v; allCreatures.forEach { it.listener = v } }
     /** The creature for character id 1, 2, ... (0 = sky only). */
     private val active: Creature? get() = pick()?.takeIf { it in okCreatures && it === loadedCreature }
-    private val worldOn: Boolean get() = input.world >= 0 && input.video < 0 && worldState == 1
+    private val worldOn: Boolean get() = input.world >= 0 && input.world != SOLID_WORLD && input.video < 0 && worldState == 1
     private val video = VideoScene(context)
     val input = SceneInput()
     @Volatile var batterySaver = false
@@ -252,6 +252,28 @@ class GlLoop(
         video.onSurfaceChanged(width, height)
     }
 
+    /** Only on the home screen (the wallpaper service turns it on): in-app previews have their own UI swipes. */
+    fun enableFingerSwipes(on: Boolean) = postSafe { allowFingerSwipes = on }
+
+    private fun fingerSwipe() {
+        if (!allowFingerSwipes || creatureOwnsGesture) return
+        val now = System.currentTimeMillis()
+        val dx = swLastX - swDownX; val dy = swLastY - swDownY
+        val ms = (now - swDownAt).coerceAtLeast(1L)
+        // The launcher already told us about this page change: the page physics handle it.
+        if (now - lastOffsetMoveAt < 600L) return
+        if (abs(dx) < 0.22f || abs(dy) > abs(dx) * 0.7f || ms > 900L) return
+        val dir = -sign(dx)                                   // finger left = next page to the right
+        val speed = abs(dx) / (ms / 1000f)                    // screens per second
+        // The same push the page physics would give: a quick slide and spring back, then a reaction.
+        lagV += -dir * (0.9f + min(speed, 4f) * 0.35f)
+        val c = active ?: return
+        if (now - lastSwipeReact > 1500) {
+            lastSwipeReact = now
+            try { c.swiped(dir, speed > 2.2f) } catch (_: Throwable) {}
+        }
+    }
+
     private var ledgeTick = 0
     /**
      * Widgets the 3D kitty can play with: our own placed widgets plus the ones the user marked in
@@ -286,6 +308,7 @@ class GlLoop(
     private fun swipePhysics(dt: Float, c: Creature) {
         val p = pagePos
         if (lastPage.isNaN()) lastPage = p
+        if (abs(p - lastPagePosSeen) > 0.002f) { lastOffsetMoveAt = System.currentTimeMillis(); lastPagePosSeen = p }
         val v = (p - lastPage) / max(dt, 1e-3f)
         lastPage = p
         pageVel = pageVel * 0.55f + v * 0.45f
@@ -309,7 +332,7 @@ class GlLoop(
     }
 
     private fun ensureParts() {
-        val wantWorld = input.world >= 0 && input.video < 0
+        val wantWorld = input.world >= 0 && input.world != SOLID_WORLD && input.video < 0
         val wantSky = input.world < 0 && input.video < 0
         if (wantSky && skyState == 0) {
             skyState = if (safeInit("sky") { scene.onSurfaceCreated(); if (rw > 0) scene.onSurfaceChanged(rw, rh) }) 1 else -1
@@ -367,17 +390,25 @@ class GlLoop(
     // Touch, in normalised screen coordinates (0..1, y down).
     // The creature gets first look at every touch; what it doesn't use goes to the sky.
     private var creatureOwnsGesture = false
+    // Finger swipes: a fallback for launchers that don't report page offsets (many don't).
+    private var swDownX = 0f; private var swDownY = 0f; private var swLastX = 0f; private var swLastY = 0f
+    private var swDownAt = 0L; private var lastOffsetMoveAt = 0L; private var lastPagePosSeen = 0f
+    private var allowFingerSwipes = false
+
     fun touchDown(nx: Float, ny: Float) = postSafe {
         touching = true
+        swDownX = nx; swDownY = ny; swLastX = nx; swLastY = ny; swDownAt = System.currentTimeMillis()
         creatureOwnsGesture = active?.touchDown(nx, ny) == true
         if (!creatureOwnsGesture) { if (worldOn) world.touch(nx, ny) else if (skyOk) scene.touchDown(nx, ny) }
     }
     fun touchMove(nx: Float, ny: Float) = postSafe {
+        swLastX = nx; swLastY = ny
         active?.touchMove(nx, ny)
         if (!creatureOwnsGesture && !worldOn && skyOk) scene.touchMove(nx, ny)
     }
     fun touchUp() = postSafe {
         touching = false
+        fingerSwipe()
         active?.touchUp()
         if (!creatureOwnsGesture && !worldOn && skyOk) scene.touchUp()
         creatureOwnsGesture = false
@@ -489,7 +520,9 @@ class GlLoop(
         } else if (skyOk) {
             scene.update(dt, input); scene.draw(input)
         } else {
-            GLES20.glClearColor(0f, 0f, 0f, 1f); GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            val bg = if (input.world == SOLID_WORLD) input.bgColor else android.graphics.Color.BLACK
+            GLES20.glClearColor(android.graphics.Color.red(bg) / 255f, android.graphics.Color.green(bg) / 255f, android.graphics.Color.blue(bg) / 255f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         }
         if (showMainCreature) active?.let { c ->
             if (c === kitty3d) { fillLedges(); kitty3d.viewLag = lag }
