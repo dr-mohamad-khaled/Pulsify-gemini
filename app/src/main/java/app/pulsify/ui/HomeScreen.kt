@@ -330,6 +330,14 @@ private fun moodLine(character: Int): String {
             else -> "Bolt is rolling around. Hold a finger near it."
         }
     }
+    if (character == 10) return when {
+        d.charging -> "Charging. Snowy is flapping with excitement."
+        d.batteryLevel < 0.15f -> "Low battery. Snowy is a sleepy little puff."
+        else -> when (DeviceState.moodNow()) {
+            Mood.NIGHT -> "Snowy is asleep. Tiny duck snores."
+            else -> "Snowy is quacking at things. Tap a widget and watch it hop up."
+        }
+    }
     if (character == 9) return when {
         d.charging -> "Charging. The gang is passing a hot battery around."
         d.batteryLevel < 0.15f -> "Low battery. The gang is melting a little."

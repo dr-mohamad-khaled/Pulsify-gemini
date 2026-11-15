@@ -182,7 +182,7 @@ fun FriendsScreen(state: AppState, onBack: () -> Unit) {
                 Gap(16.dp)
             }
             LazyRow(contentPadding = PaddingValues(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(CREATURES) { cr -> AvatarPick(cr, cr.id == addId) { addId = cr.id; addCoat = 0 } }
+                items(app.pulsify.engine.BUDDY_CREATURES) { cr -> AvatarPick(cr, cr.id == addId) { addId = cr.id; addCoat = 0 } }
             }
             val info = creatureInfo(addId)
             if (info != null && info.coats.size > 1) {
@@ -254,7 +254,7 @@ private fun BackCircle(onBack: () -> Unit) {
 
 private fun nextCreature(id: Int, used: List<Int>): Int {
     var n = id
-    repeat(CREATURES.size) { n = n % CREATURES.size + 1; if (n !in used) return n }
+    repeat(app.pulsify.engine.BUDDY_CREATURES.size) { n = n % app.pulsify.engine.BUDDY_CREATURES.size + 1; if (n !in used) return n }
     return n
 }
 

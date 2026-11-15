@@ -65,11 +65,13 @@ class GlLoop(
     val bolt = BoltScene(context)
     val gloop = GloopScene(context)
     val kitty3d = Kitty3DScene(context)
+    /** The Meshy 3D pets (Snowball the kitten, Honey the pup, Nimbus the robot, Snowy the duckling). */
+    val pet3d = Pet3DScene(context)
     private val creatures: List<Creature> = listOf(mochi, kalboob, kitty, kiwi, glowy, gromble, nutty, bolt, gloop)
-    private val allCreatures: List<Creature> = creatures + kitty3d
+    private val allCreatures: List<Creature> = creatures + kitty3d + pet3d
     /** The creature this frame wants: by character id, and for Kitty by style (1.. = 3D shapes). */
     private fun pick(): Creature? {
-        if (input.character == 3 && input.style > 0) { kitty3d.design = (input.style - 1).coerceIn(0, 2); return kitty3d }
+        petSpeciesFor(input.character, input.style)?.let { pet3d.species = it; return pet3d }
         return creatures.getOrNull(input.character - 1)
     }
     /** Discoveries and bond XP from the sky and every creature. */
@@ -526,6 +528,7 @@ class GlLoop(
         }
         if (showMainCreature) active?.let { c ->
             if (c === kitty3d) { fillLedges(); kitty3d.viewLag = lag }
+            if (c === pet3d) { fillLedges(); pet3d.viewLag = lag }
             c.setGround(if (worldOn) world.groundY else Float.NaN); c.update(dt, input)
             swipePhysics(dt, c)
             val vw = if (offscreen) fbW else surfW; val vh = if (offscreen) fbH else surfH

@@ -95,6 +95,7 @@ val BOLT_INFO = CreatureInfo(
         TrickInfo("radar", "Radar", "🛰️"), TrickInfo("jump", "Jump", "⬆️"), TrickInfo("scan", "Scan", "🔍"),
         TrickInfo("faces", "Faces", "😎"),
     ),
+    styles = listOf("Doodle", "Nimbus"),
 )
 
 val GLOOP_INFO = CreatureInfo(
@@ -116,7 +117,27 @@ val GLOOP_INFO = CreatureInfo(
     ),
 )
 
-val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO }
+val SNOWY_INFO = CreatureInfo(
+    SNOWY_ID, "Snowy", "Fluffy duckling. Quacks at everything, dreams of flying.",
+    "Tap: quack-poke. Hold: cuddles. Rub: giggles. Drag to carry. Tap a widget and it hops on top.",
+    0xFFFFB45C.toInt(), listOf(CoatInfo("Snow white", 0xFFF5F2EA.toInt(), 0xFFFF9A3C.toInt())),
+    listOf(
+        EnvInfo("Backyard", 3, c1 = 0xFF5FB2FF.toInt(), c2 = 0xFF4CAF50.toInt()),
+        EnvInfo("Snow Day", 4, c1 = 0xFFDDEBFF.toInt(), c2 = 0xFF2E7D6B.toInt()),
+        EnvInfo("Blossom Garden", 11, c1 = 0xFFFFB7D5.toInt(), c2 = 0xFF8C6CE6.toInt()),
+        EnvInfo("Plain Colour", SOLID_WORLD, c1 = 0xFF000000.toInt(), c2 = 0xFF111111.toInt()),
+    ),
+    listOf(
+        TrickInfo("quack", "Quack", "🦆"), TrickInfo("flap", "Flap", "🪽"), TrickInfo("fly", "Try to fly", "✈️"),
+        TrickInfo("preen", "Preen", "✨"), TrickInfo("crumbs", "Bread crumbs", "🍞"), TrickInfo("splash", "Puddle", "💦"),
+        TrickInfo("toy", "Rubber duck", "🐤"), TrickInfo("butterfly", "Butterfly", "🦋"), TrickInfo("sleep", "Nap", "💤"),
+    ),
+)
+
+val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO + SNOWY_INFO }
+
+/** Creatures that can also live in a home-screen widget (the 2D friends). */
+val BUDDY_CREATURES: List<CreatureInfo> by lazy { CREATURES.filter { it.id != SNOWY_ID } }
 
 private val BASE_CREATURES = listOf(
     CreatureInfo(
@@ -140,6 +161,7 @@ private val BASE_CREATURES = listOf(
             EnvInfo("Cozy Room", 5, c1 = 0xFFE0A070.toInt(), c2 = 0xFF8E3A50.toInt()),
         ),
         listOf(TrickInfo("fetch", "Fetch", "🎾"), TrickInfo("paw", "Give paw", "🐾"), TrickInfo("belly", "Belly rub", "🫶"), TrickInfo("dig", "Dig", "🕳️"), TrickInfo("howl", "Howl", "🌕"), TrickInfo("butterfly", "Butterfly", "🦋"), TrickInfo("zoomies", "Zoomies", "💨"), TrickInfo("yawn", "Yawn", "🥱")),
+        styles = listOf("Doodle", "Honey"),
     ),
     CreatureInfo(
         3, "Kitty", "Curious, aloof, a little dramatic.",
@@ -151,7 +173,7 @@ private val BASE_CREATURES = listOf(
             EnvInfo("Box Fort", 8, c1 = 0xFFD9A066.toInt(), c2 = 0xFFF06292.toInt()),
         ),
         listOf(TrickInfo("pounce", "Pounce", "🎯"), TrickInfo("knock", "Knock the cup", "☕"), TrickInfo("cucumber", "Cucumber!", "🥒"), TrickInfo("box", "If it fits", "📦"), TrickInfo("zoomies", "Zoomies", "💨"), TrickInfo("purr", "Purr", "💜"), TrickInfo("groom", "Groom", "👅"), TrickInfo("loaf", "Loaf", "🍞"), TrickInfo("trill", "Trill", "🎶"), TrickInfo("stretch", "Stretch", "🙆")),
-        styles = listOf("2D", "3D Explorer", "3D Dumpling", "3D Slim"),
+        styles = listOf("Doodle", "Snowball"),
     ),
 )
 
