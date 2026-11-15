@@ -325,7 +325,7 @@ class Kitty3DScene(private val context: Context) : Creature {
     private fun zoomies() {
         if (act == Act.CARRY || act == Act.HANG || onLedge >= 0 || !grounded) { start(Act.SPIN, 1.4f); return }
         zoomLaps = 3 + Random.nextInt(2)
-        targetX = if (x > 0f) -halfW + size * 0.35f else halfW - size * 0.35f
+        targetX = if (x > 0f) -halfW + size * 0.45f else halfW - size * 0.45f
         hopT = 1f
         start(Act.ZOOM); discover("zoomies")
         burst(9f, 3, x, y + size * 0.5f, 1f, 0.95f, 0.6f)
@@ -333,7 +333,7 @@ class Kitty3DScene(private val context: Context) : Creature {
 
     private fun pounceAt(ux: Float) {
         if (act == Act.SLEEP || act == Act.CARRY || !grounded || onLedge >= 0) return
-        targetX = ux.coerceIn(-halfW + size * 0.35f, halfW - size * 0.35f)
+        targetX = ux.coerceIn(-halfW + size * 0.45f, halfW - size * 0.45f)
         start(Act.POUNCE)
         jump(targetX, floorY, size * (0.22f + min(0.3f, abs(targetX - x)) * 0.5f))
     }
@@ -549,7 +549,7 @@ class Kitty3DScene(private val context: Context) : Creature {
                     }
                     // hop down to the floor
                     start(Act.JUMP_DOWN)
-                    val tx = (x + (if (x > 0f) -1 else 1) * size * 0.4f).coerceIn(-halfW + size * 0.35f, halfW - size * 0.35f)
+                    val tx = (x + (if (x > 0f) -1 else 1) * size * 0.4f).coerceIn(-halfW + size * 0.45f, halfW - size * 0.45f)
                     jump(tx, floorY, size * 0.2f)
                 } else {
                     if (Random.nextFloat() < dt * 0.4f) lookAt(x + (Random.nextFloat() - 0.5f) * 1.5f, y - size)
@@ -620,7 +620,7 @@ class Kitty3DScene(private val context: Context) : Creature {
 
     private fun fallOff() {
         onLedge = -1; grounded = false; vy = size * 0.2f; vx = 0f
-        x = x.coerceIn(-halfW + size * 0.35f, halfW - size * 0.35f)
+        x = x.coerceIn(-halfW + size * 0.45f, halfW - size * 0.45f)
         start(Act.FALL); discover("whoops")
     }
 
@@ -670,7 +670,7 @@ class Kitty3DScene(private val context: Context) : Creature {
             // Hide behind its side and peek out.
             else -> {
                 peekSide = if (x < cx) -1f else 1f
-                targetX = (if (peekSide < 0) L.l + size * 0.08f else L.r - size * 0.08f).coerceIn(-halfW + size * 0.3f, halfW - size * 0.3f)
+                targetX = (if (peekSide < 0) L.l + size * 0.08f else L.r - size * 0.08f).coerceIn(-halfW + size * 0.42f, halfW - size * 0.42f)
                 if (L.b > floorY + size * 0.6f) { start(Act.LOOK, 1f); return }    // floating too high to hide behind
                 nextAfterWalk = Act.PEEK
                 start(Act.WALK)
@@ -728,7 +728,7 @@ class Kitty3DScene(private val context: Context) : Creature {
                 }
             }
             if (y <= floorY) { y = floorY; land() }
-            val wall = halfW - size * 0.3f
+            val wall = halfW - size * 0.42f
             if (abs(x) > wall && act == Act.TUMBLE && y > floorY + size * 0.15f) {
                 // slammed into the edge of the screen: grab on
                 clingSide = sign(x); x = clingSide * wall
@@ -740,7 +740,7 @@ class Kitty3DScene(private val context: Context) : Creature {
             x = x.coerceIn(-wall, wall)
         } else {
             if (abs(vx) > 0f && act != Act.WALK && act != Act.CHASE && act != Act.ZOOM) { x += vx * dt; vx *= exp(-6f * dt); if (abs(vx) < 0.005f) vx = 0f }
-            x = x.coerceIn(-halfW + size * 0.3f, halfW - size * 0.3f)
+            x = x.coerceIn(-halfW + size * 0.42f, halfW - size * 0.42f)
             if (abs(y - floorY) > 0.001f && onLedge < 0) { grounded = false; vy = 0f }
         }
     }
