@@ -19,7 +19,8 @@ varying vec3 vP;
 varying vec2 vUv;
 varying vec2 vEye;
 varying vec4 vCol;
-varying vec2 vInfo;
+varying vec2 vEye2;
+varying float vGloss;
 
 float band(float x, float w) { return 1.0 - smoothstep(w * 0.7, w, abs(x)); }
 
@@ -83,22 +84,24 @@ float faceMask(vec2 q) {
 
 void main() {
     vec3 base = vCol.a > 0.5 ? vCol.rgb : texture2D(uTex, vUv).rgb;
-    float gloss = vInfo.y;
+    float gloss = vGloss;
     vec3 emit = vec3(0.0);
-    int eid = int(vInfo.x + 0.5);
-    if (uEyeMode > 0.5 && uEyeMode < 1.5 && (eid == 1 || eid == 2)) {
-        float g;
-        vec4 r = eid == 1 ? eyeShade(base, vEye, uEyeL, 0.0, g) : eyeShade(base, vEye, uEyeR, 1.0, g);
-        base = r.rgb; gloss = max(gloss, g * 0.95);
-    } else if (uEyeMode > 1.5 && (eid == 3 || eid == 4)) {
-        float r4 = pow(pow(abs(vEye.x), 4.0) + pow(abs(vEye.y), 4.0), 0.25);
-        float glass = 1.0 - smoothstep(0.90, 0.95, r4);
-        base = mix(base, vec3(0.012, 0.014, 0.03), glass);
-        gloss = mix(gloss, 0.8, glass);
-        if (eid == 3) {
-            vec2 q = vEye * uScreenHalf.xy;
-            float f = faceMask(q) * glass * (1.0 - smoothstep(0.80, 0.88, r4));
-            emit = vec3(0.62, 0.48, 1.0) * f * 1.6;
+    if (uEyeMode > 0.5 && uEyeMode < 1.5) {
+        float g = 0.0;
+        if (dot(vEye, vEye) < 1.1) { vec4 r = eyeShade(base, vEye, uEyeL, 0.0, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
+        if (dot(vEye2, vEye2) < 1.1) { vec4 r = eyeShade(base, vEye2, uEyeR, 1.0, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
+    } else if (uEyeMode > 1.5) {
+        for (int k = 0; k < 2; k++) {
+            vec2 sv = k == 0 ? vEye : vEye2;
+            if (abs(sv.x) > 1.2 || abs(sv.y) > 1.2) continue;
+            float r4 = pow(pow(abs(sv.x), 4.0) + pow(abs(sv.y), 4.0), 0.25);
+            float glass = 1.0 - smoothstep(0.90, 0.95, r4);
+            base = mix(base, vec3(0.012, 0.014, 0.03), glass);
+            gloss = mix(gloss, 0.8, glass);
+            if (k == 0) {
+                float f = faceMask(sv * uScreenHalf.xy) * glass * (1.0 - smoothstep(0.80, 0.88, r4));
+                emit = vec3(0.62, 0.48, 1.0) * f * 1.6;
+            }
         }
     }
     vec3 N = normalize(vN);

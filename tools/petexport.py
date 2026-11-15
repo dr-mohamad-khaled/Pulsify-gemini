@@ -7,7 +7,7 @@ PET1 layout (little endian)
   'PET1' u32 nverts u32 nidx u32 nbones u32 nclips f32 height f32 fps u32 eyeMode(0 none, 1 eyes, 2 screen)
   f32 fur[3] f32 lash[3]
   vertices, 40 bytes: pos 3f | normal 3 i8 + gloss u8 | uv 2 u16 | eye uv 2 i16 (/4096) | bone 4 u8 | weight 4 u8 | colour rgba8
-                      | info 4 u8 (eye id: 0 none 1 L 2 R 3 screen front 4 screen back, 0, 0, 0)
+                      | eye2 uv 2 i16 (eyes: aEye = left eye, aEye2 = right eye; robot: front / back screen; 7.9 = none)
   indices u16
   clips: u8 nameLen, name, u16 frames, u8 loop, then frames x nbones x 12 f16 (skin matrix rows 0..2),
          then frames x 8 f16 controls (blinkL, blinkR, lookXL, lookYL, lookXR, lookYR, expr, phase)
@@ -73,17 +73,20 @@ for o in meshes:
             vi = me.loops[li].vertex_index
             v = me.vertices[vi]
             uv = tuple(uv0[li].uv) if body else (0.0, 0.0)
-            eid = 0; e = (0.0, 0.0)
-            for lay, k in ((eyeL, 1), (eyeR, 2), (scF, 3), (scB, 4)):
-                if lay is None: continue
+            def lay_uv(lay):
+                if lay is None: return (7.9, 7.9)
                 u = tuple(lay.data[li].uv)
-                if abs(u[0]) < 1.6 and abs(u[1]) < 1.6: eid, e = k, u; break
+                return u if abs(u[0]) < 7.5 and abs(u[1]) < 7.5 else (7.9, 7.9)
+            if eyeL is not None: e, e2 = lay_uv(eyeL), lay_uv(eyeR)
+            elif scF is not None: e, e2 = lay_uv(scF), lay_uv(scB)
+            else: e, e2 = (7.9, 7.9), (7.9, 7.9)
+            eid = (e, e2)
             c = tuple(col.data[vi].color) if col is not None else (0, 0, 0, 0)
-            key = (o.name, vi, round(uv[0], 5), round(uv[1], 5), eid)
+            key = (o.name, vi, round(uv[0], 5), round(uv[1], 5))
             if key not in vmap:
                 n = v.normal
                 cc = [int(max(0, min(1, x ** (1 / 2.2))) * 255) for x in c[:3]]
-                verts.append((tuple(v.co), (n.x, n.y, n.z), gloss, uv, e, vw[vi][0], vw[vi][1],
+                verts.append((tuple(v.co), (n.x, n.y, n.z), gloss, uv, None, vw[vi][0], vw[vi][1],
                                (cc[0], cc[1], cc[2], 0 if body else 255), eid))
                 vmap[key] = len(verts) - 1
             idx.append(vmap[key])
@@ -158,9 +161,9 @@ with open(os.path.join(out_dir, f'{name}.pet'), 'wb') as f:
         f.write(struct.pack('<3f', *p))
         f.write(struct.pack('<3bB', *[int(max(-127, min(127, round(x * 127)))) for x in n], g))
         f.write(struct.pack('<2H', *[int(max(0, min(65535, round((x % 1.0 if x != 1.0 else 1.0) * 65535)))) for x in uv]))
-        f.write(struct.pack('<2h', *[int(max(-32767, min(32767, round(x * 4096)))) for x in e]))
+        f.write(struct.pack('<2h', *[int(max(-32767, min(32767, round(x * 4096)))) for x in eid[0]]))
         f.write(struct.pack('<4B', *bs)); f.write(struct.pack('<4B', *ws)); f.write(struct.pack('<4B', *c))
-        f.write(struct.pack('<4B', eid, 0, 0, 0))
+        f.write(struct.pack('<2h', *[int(max(-32767, min(32767, round(x * 4096)))) for x in eid[1]]))
     f.write(struct.pack(f'<{len(idx)}H', *idx))
     f.write(blob)
 print('WROTE', os.path.getsize(os.path.join(out_dir, f'{name}.pet')))

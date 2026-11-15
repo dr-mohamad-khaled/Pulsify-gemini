@@ -10,7 +10,7 @@ def load(path):
     V = np.frombuffer(b, np.uint8, nv * 40, o).reshape(nv, 40); o += nv * 40
     pos = V[:, 0:12].copy().view(np.float32).reshape(nv, 3)
     bones = V[:, 24:28].astype(int); w = V[:, 28:32].astype(np.float32) / 255
-    col = V[:, 32:36]; eid = V[:, 36]
+    col = V[:, 32:36]; eid = None
     o += ni * 2
     clips = {}
     for _ in range(nc):

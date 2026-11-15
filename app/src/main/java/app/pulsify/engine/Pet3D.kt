@@ -58,7 +58,7 @@ class Pet3D(private val context: Context) {
         uni["uB"] = GLES20.glGetUniformLocation(prog, "uB[0]").let { if (it >= 0) it else GLES20.glGetUniformLocation(prog, "uB") }
         for (n in listOf("uVP", "uModel", "uTex", "uEyes", "uEyeMode", "uEyeL", "uEyeR", "uFace", "uFur", "uLash",
             "uLightDir", "uDim", "uGlow", "uScreenHalf")) uni[n] = GLES20.glGetUniformLocation(prog, n)
-        for (n in listOf("aNrm", "aUv", "aEye", "aBone", "aWeight", "aCol", "aInfo")) uni[n] = GLES20.glGetAttribLocation(prog, n)
+        for (n in listOf("aNrm", "aUv", "aEye", "aBone", "aWeight", "aCol", "aEye2")) uni[n] = GLES20.glGetAttribLocation(prog, n)
         fxProg = Gl.program(asset("shaders/kitfx.vert"), asset("shaders/kitfx.frag"))
         for (n in listOf("uRect", "uRot", "uAspect", "uTex", "uMode", "uColor", "uCable")) fxUni[n] = GLES20.glGetUniformLocation(fxProg, n)
         val ids = IntArray(1)
@@ -212,7 +212,7 @@ class Pet3D(private val context: Context) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo)
         val aN = uni["aNrm"]!!; val aU = uni["aUv"]!!; val aE = uni["aEye"]!!; val aB = uni["aBone"]!!
-        val aW = uni["aWeight"]!!; val aC = uni["aCol"]!!; val aI = uni["aInfo"]!!
+        val aW = uni["aWeight"]!!; val aC = uni["aCol"]!!; val aI = uni["aEye2"]!!
         GLES20.glEnableVertexAttribArray(0); GLES20.glVertexAttribPointer(0, 3, GLES20.GL_FLOAT, false, 40, 0)
         attr(aN, 4, GLES20.GL_BYTE, true, 12)
         attr(aU, 2, GLES20.GL_UNSIGNED_SHORT, true, 16)
@@ -220,7 +220,7 @@ class Pet3D(private val context: Context) {
         attr(aB, 4, GLES20.GL_UNSIGNED_BYTE, false, 24)
         attr(aW, 4, GLES20.GL_UNSIGNED_BYTE, true, 28)
         attr(aC, 4, GLES20.GL_UNSIGNED_BYTE, true, 32)
-        attr(aI, 4, GLES20.GL_UNSIGNED_BYTE, false, 36)
+        attr(aI, 2, GLES20.GL_SHORT, false, 36)
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, icount, GLES20.GL_UNSIGNED_SHORT, 0)
         for (a in listOf(aN, aU, aE, aB, aW, aC, aI)) if (a >= 0) GLES20.glDisableVertexAttribArray(a)
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)

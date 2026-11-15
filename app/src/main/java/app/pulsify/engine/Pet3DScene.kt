@@ -123,7 +123,8 @@ class Pet3DScene(private val context: Context) : Creature {
                     var s: Float, var r: Float, var g: Float, var b: Float, var rot: Float)
     private val parts = ArrayList<P>()
 
-    override val busy: Boolean get() = true
+    override val busy: Boolean
+        get() = touching || sinceTouch < 2f || mode != Mode.FLOOR || (curName != "Idle" && curName != "Sleep") || parts.isNotEmpty()
 
     // ------------------------------------------------------------ lifecycle
     override fun onSurfaceCreated() { pet.create(); pet.load(species.model); cur = null }

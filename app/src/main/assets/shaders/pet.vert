@@ -6,7 +6,7 @@ attribute vec2 aEye;           // eye-local / screen-local coordinates (x4096 ->
 attribute vec4 aBone;
 attribute vec4 aWeight;
 attribute vec4 aCol;           // vertex colour (props), a = 1 for props
-attribute vec4 aInfo;          // x = eye id (0 none, 1 L, 2 R, 3 screen front, 4 screen back)
+attribute vec2 aEye2;          // right eye (robot: back screen), same scale
 
 uniform mat4 uVP;              // view-projection (GL space)
 uniform mat4 uModel;           // Blender z-up -> GL y-up, facing turn
@@ -17,7 +17,8 @@ varying vec3 vP;
 varying vec2 vUv;
 varying vec2 vEye;
 varying vec4 vCol;
-varying vec2 vInfo;            // eye id, gloss
+varying vec2 vEye2;
+varying float vGloss;
 
 vec3 xf(int b, vec4 p) { return vec3(dot(uB[b * 3], p), dot(uB[b * 3 + 1], p), dot(uB[b * 3 + 2], p)); }
 vec3 xn(int b, vec3 n) { return vec3(dot(uB[b * 3].xyz, n), dot(uB[b * 3 + 1].xyz, n), dot(uB[b * 3 + 2].xyz, n)); }
@@ -37,7 +38,8 @@ void main() {
     vN = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * sn);
     vUv = vec2(aUv.x, 1.0 - aUv.y);
     vEye = aEye / 4096.0;
+    vEye2 = aEye2 / 4096.0;
     vCol = aCol;
     float g = aNrm.w * 127.0; if (g < -0.5) g += 256.0;
-    vInfo = vec2(aInfo.x, g / 255.0);
+    vGloss = g / 255.0;
 }
