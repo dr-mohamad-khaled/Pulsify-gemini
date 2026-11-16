@@ -99,6 +99,18 @@ private fun bird(model: String) = PetSpecies(
     dances = listOf("DanceBob", "DanceWings", "DanceSide", "DanceSpin", "DanceHeadbang"), run = "Run", runSpeed = 1.2f,
     ownFace = true, angry = "Angry", alias = BIRD_ALIAS, big = 0.85f,
 )
+/** Leo the lion cub: a tiny lion who is SURE he is the king. Roars come out as squeaks; he loves belly rubs. */
+val PET_LION = PetSpecies(
+    "lion", "Walk", 0.5f,
+    listOf("LookAround" to 2.5f, "HeadTilt" to 2f, "Yawn" to 1f, "Sneeze" to 0.6f, "Stretch" to 1.4f, "Groom" to 1.6f,
+        "RollOver" to 1.2f, "ChaseTail" to 0.9f, "Pounce" to 1.4f, "TinyRoar" to 1.6f, "Beg" to 0.8f, "PlayBall" to 1.6f,
+        "ChaseButterfly" to 1.2f, "Sit" to 1f),
+    "TinyRoar", "Plugged", "DanceStomp", "BigRoar",
+    mapOf("roar" to "TinyRoar", "bigroar" to "BigRoar", "pounce" to "Pounce", "ball" to "PlayBall", "belly" to "RollOver",
+        "groom" to "Groom", "beg" to "Beg", "stalk" to "Pounce", "butterfly" to "ChaseButterfly", "sleep" to "Sleep"),
+    dances = listOf("DanceBob", "DanceStomp", "DanceRoar", "DanceSpin"), run = "Run", runSpeed = 1.3f, ownFace = true, angry = "Angry",
+    alias = mapOf("Spin" to "DanceSpin", "Shake" to "Sneeze"),
+)
 val PET_BUDGIE = bird("budgie")
 val PET_COCKATIEL = bird("cockatiel")
 val PET_RINGNECK = bird("ringneck")
@@ -619,6 +631,7 @@ class Pet3DScene(private val context: Context) : Creature {
 /** Which Meshy pet (if any) a character id + chosen look maps to. Snowy (10) only exists in 3D. */
 fun petSpeciesFor(character: Int, style: Int, coat: Int = 0): PetSpecies? = when {
     character == SNOWY_ID -> PET_DUCK
+    character == LEO_ID -> PET_LION
     style <= 0 -> null
     character == 4 -> when (coat) { 0 -> PET_RINGNECK; 2 -> PET_COCKATIEL; else -> PET_BUDGIE }
     character == 3 -> PET_KITTEN

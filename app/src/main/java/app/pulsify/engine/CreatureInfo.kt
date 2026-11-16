@@ -162,6 +162,22 @@ val SNOWY_INFO = CreatureInfo(
 )
 
 const val COSMO_ID = 11
+const val LEO_ID = 12
+
+val LEO_INFO = CreatureInfo(
+    LEO_ID, "Leo", "Lion cub. Absolutely sure he is the king. His roar disagrees.",
+    "Tap: he jumps. Hold: purrs into your hand. Rub: rolls over for a belly rub. Hold the ground: a butterfly to stalk.",
+    0xFFFFB36B.toInt(), listOf(CoatInfo("Golden", 0xFFD9A15A.toInt(), 0xFF8A5A2B.toInt())),
+    worlds(listOf(P_SAVANNA, P_WATERHOLE, P_BACKYARD), listOf(
+        EnvInfo("Snow Day", 4, c1 = 0xFFDDEBFF.toInt(), c2 = 0xFF2E7D6B.toInt()),
+        EnvInfo("Cozy Room", 5, c1 = 0xFFE0A070.toInt(), c2 = 0xFF8E3A50.toInt()),
+    ), listOf(EnvInfo("Plain Colour", SOLID_WORLD, c1 = 0xFF000000.toInt(), c2 = 0xFF111111.toInt()))),
+    listOf(
+        TrickInfo("roar", "Roar!", "🦁"), TrickInfo("bigroar", "Real roar", "📢"), TrickInfo("pounce", "Pounce", "🐾"),
+        TrickInfo("ball", "Ball", "⚽"), TrickInfo("belly", "Belly rub", "🫶"), TrickInfo("groom", "Wash up", "✨"),
+        TrickInfo("beg", "Beg", "🙏"), TrickInfo("butterfly", "Butterfly", "🦋"), TrickInfo("sleep", "Nap", "💤"),
+    ),
+)
 
 val COSMO_INFO = CreatureInfo(
     COSMO_ID, "Cosmo", "Little astronaut, falling forever through deep space. He's fine with it.",
@@ -174,10 +190,10 @@ val COSMO_INFO = CreatureInfo(
     ),
 )
 
-val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO + SNOWY_INFO + COSMO_INFO }
+val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO + SNOWY_INFO + COSMO_INFO + LEO_INFO }
 
 /** Creatures that can also live in a home-screen widget (the 2D friends). */
-val BUDDY_CREATURES: List<CreatureInfo> by lazy { CREATURES.filter { it.id != SNOWY_ID && it.id != COSMO_ID } }
+val BUDDY_CREATURES: List<CreatureInfo> by lazy { CREATURES.filter { it.id != SNOWY_ID && it.id != COSMO_ID && it.id != LEO_ID } }
 
 private val BASE_CREATURES = listOf(
     CreatureInfo(
