@@ -32,6 +32,7 @@ class PetSpecies(
     val angry: String? = null,             // too many pokes in a row
     val alias: Map<String, String> = emptyMap(),   // scene clip name -> this pet's clip (birds fly instead of jump)
     val big: Float = 1f,                   // on-screen size factor
+    val angryPokes: Int = 7,               // pokes within 8 s that trigger [angry]
 )
 
 val PET_KITTEN = PetSpecies(
@@ -122,6 +123,17 @@ val PET_LUNA = PetSpecies(
         "trill" to "Meow", "stretch" to "Stretch", "knock" to "PlayBall", "cucumber" to "Hiss"),
     dances = listOf("DanceBob", "DanceStomp", "DanceRoar", "DanceSpin"), run = "Run", runSpeed = 1.3f, ownFace = true, angry = "Hiss",
     alias = mapOf("Spin" to "DanceSpin", "Shake" to "Sneeze"),
+)
+/** Nutmeg (Nutty's 3D look): a twitchy red squirrel. Keep tapping him and he gets knocked out cold. */
+val PET_NUTMEG = PetSpecies(
+    "nutmeg", "Walk", 0.6f,
+    listOf("LookAround" to 2.5f, "Lookout" to 1.6f, "Nibble" to 2f, "Stash" to 1.4f, "TailFlick" to 2f, "Wash" to 1.4f,
+        "Scratch" to 1.2f, "Sneeze" to 0.6f, "Zoomies" to 0.8f, "Drum" to 1f, "HeadTilt" to 1.6f, "ChaseButterfly" to 1f),
+    "TailFlick", "Plugged", "DanceTail", "Spin",
+    mapOf("nibble" to "Nibble", "stash" to "Stash", "lookout" to "Lookout", "flick" to "TailFlick", "zoom" to "Zoomies",
+        "catch" to "Catch", "spin" to "Spin", "scratch" to "Scratch", "feed" to "Catch", "drum" to "Drum"),
+    dances = listOf("DanceTail", "DanceDrum", "DanceHop"), run = "Run", runSpeed = 1.5f, ownFace = true, angry = "Knockdown",
+    angryPokes = 5, big = 0.85f,
 )
 val PET_BUDGIE = bird("budgie")
 val PET_COCKATIEL = bird("cockatiel")
@@ -337,7 +349,11 @@ class Pet3DScene(private val context: Context) : Creature {
         lastTap = time
         pokeTimes += time; pokeTimes.removeAll { time - it > 8f }
         val mad = species.angry
-        if (mad != null && pokeTimes.size >= 7) { pokeTimes.clear(); taps = 0; play(mad); discover("grumpy"); return }
+        if (mad != null && pokeTimes.size >= species.angryPokes) {
+            pokeTimes.clear(); taps = 0; play(mad); discover("grumpy")
+            if (mad == "Knockdown") { discover("knocked out"); for (i in 0 until 4) burst(8f, 1, x, headY - size * 0.5f, 1f, 0.9f, 0.3f, 0.05f) }
+            return
+        }
         if (taps >= 3) { taps = 0; play(species.tapThrice); discover("triple tap"); return }
         play("Poke"); burst(9f, 3, x, headY, 1f, 0.95f, 0.6f, 0.025f)
     }
@@ -647,6 +663,7 @@ fun petSpeciesFor(character: Int, style: Int, coat: Int = 0): PetSpecies? = when
     style <= 0 -> null
     character == 4 -> when (coat) { 0 -> PET_RINGNECK; 2 -> PET_COCKATIEL; else -> PET_BUDGIE }
     character == 3 -> PET_LUNA
+    character == 7 -> PET_NUTMEG
     character == 2 -> PET_PUPPY
     character == 8 -> PET_BOT
     character == 6 -> PET_REAPER

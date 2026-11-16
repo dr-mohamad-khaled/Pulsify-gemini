@@ -107,6 +107,7 @@ val NUTTY_INFO = CreatureInfo(
         TrickInfo("spin", "Spin", "🌀"), TrickInfo("scratch", "Scratch", "🦶"), TrickInfo("feed", "Give an acorn", "🎁"),
         TrickInfo("drum", "Drum solo", "🥁"),
     ),
+    styles = listOf("Doodle", "Nutmeg"),
 )
 
 val BOLT_INFO = CreatureInfo(
