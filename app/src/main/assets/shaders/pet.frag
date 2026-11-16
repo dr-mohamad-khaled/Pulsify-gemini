@@ -3,7 +3,8 @@
 precision mediump float;
 uniform sampler2D uTex;
 uniform sampler2D uEyes;       // L | R eye crops (rim colour outside the iris)
-uniform float uEyeMode;        // 0 none, 1 painted eyes, 2 robot screen
+uniform float uEyeMode;        // 0 none, 1 painted eyes, 2 robot screen, 3 layered eyes (eye white + movable iris)
+uniform vec4 uIris;            // mode 3: iris centre offset in eye units, L.xy R.xy
 uniform vec4 uEyeL;            // blink, lookX, lookY, brow tilt (+ sad, - angry)
 uniform vec4 uEyeR;
 uniform vec2 uFace;            // robot: expression id (0..5, fractional = cross-fade), phase
@@ -47,6 +48,33 @@ vec4 eyeShade(vec3 base, vec2 uv, vec4 E, float side, out float glossy) {
     vec3 c = mix(eye, lidc, lid);
     glossy = inside * (1.0 - lid);
     return vec4(mix(base, c, inside), inside);
+}
+
+// Layered eyes (mode 3): row 0 of the atlas = the eye white, its alpha = the eye's shape; row 1 = the
+// iris + pupil with alpha. The iris slides to look and scales for the pupil mood; lids only cover the eye.
+vec4 eyeShade3(vec3 base, vec2 uv, vec4 E, float side, vec2 ioff, out float glossy) {
+    glossy = 0.0;
+    vec2 t0 = clamp(vec2(0.5 + uv.x * 0.5, 0.5 - uv.y * 0.5), 0.002, 0.998);
+    vec4 w = texture2D(uEyes, vec2(t0.x * 0.5 + side * 0.5, t0.y * 0.5));
+    if (w.a < 0.01) return vec4(base, 0.0);
+    float ps = max(0.4, uMood.y);
+    vec2 q = (uv - ioff - vec2(E.y, E.z) * 0.55) / ps;
+    vec2 ti = vec2(0.5 + q.x * 0.5, 0.5 - q.y * 0.5);
+    vec4 ir = texture2D(uEyes, vec2(clamp(ti.x, 0.002, 0.998) * 0.5 + side * 0.5, 0.5 + clamp(ti.y, 0.002, 0.998) * 0.5));
+    ir.a *= step(0.0, ti.x) * step(ti.x, 1.0) * step(0.0, ti.y) * step(ti.y, 1.0);
+    vec3 eye = mix(w.rgb, ir.rgb, ir.a);
+    float sg = side < 0.5 ? 1.0 : -1.0;
+    float b = E.x;
+    float uu = uv.x * uv.x;
+    float yup = 0.95 - b * 1.25 + uu * b * 0.30 + E.w * uv.x * 0.55 * sg - abs(E.w) * 0.30;
+    float ylo = -0.95 + b * 0.75 + uMood.x * (1.35 - 0.8 * uu);
+    float upper = smoothstep(-0.03, 0.03, uv.y - yup);
+    float lower = smoothstep(-0.03, 0.03, ylo - uv.y);
+    float lid = max(upper, lower);
+    float lash = upper * (1.0 - smoothstep(0.08, 0.14, uv.y - yup)) * smoothstep(0.0, 0.12, b + abs(E.w));
+    vec3 c = mix(eye, mix(uFur, uLash, lash), lid);
+    glossy = w.a * (1.0 - lid);
+    return vec4(mix(base, c, w.a), w.a);
 }
 
 // The robot's face, in model units around the screen centre (x right, y up).
@@ -94,6 +122,10 @@ void main() {
         float g = 0.0;
         if (dot(vEye, vEye) < 1.1) { vec4 r = eyeShade(base, vEye, uEyeL, 0.0, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
         if (dot(vEye2, vEye2) < 1.1) { vec4 r = eyeShade(base, vEye2, uEyeR, 1.0, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
+    } else if (uEyeMode > 2.5) {
+        float g = 0.0;
+        if (dot(vEye, vEye) < 1.2) { vec4 r = eyeShade3(base, vEye, uEyeL, 0.0, uIris.xy, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
+        if (dot(vEye2, vEye2) < 1.2) { vec4 r = eyeShade3(base, vEye2, uEyeR, 1.0, uIris.zw, g); base = r.rgb; gloss = max(gloss, g * 0.95); }
     } else if (uEyeMode > 1.5) {
         for (int k = 0; k < 2; k++) {
             vec2 sv = k == 0 ? vEye : vEye2;

@@ -161,7 +161,7 @@ private val BASE_CREATURES = listOf(
             EnvInfo("Cozy Room", 5, c1 = 0xFFE0A070.toInt(), c2 = 0xFF8E3A50.toInt()),
         ),
         listOf(TrickInfo("fetch", "Fetch", "🎾"), TrickInfo("paw", "Give paw", "🐾"), TrickInfo("belly", "Belly rub", "🫶"), TrickInfo("dig", "Dig", "🕳️"), TrickInfo("howl", "Howl", "🌕"), TrickInfo("butterfly", "Butterfly", "🦋"), TrickInfo("zoomies", "Zoomies", "💨"), TrickInfo("yawn", "Yawn", "🥱")),
-        styles = listOf("Doodle", "Honey"),
+        styles = listOf("Doodle", "Blizzard"),
     ),
     CreatureInfo(
         3, "Kitty", "Curious, aloof, a little dramatic.",

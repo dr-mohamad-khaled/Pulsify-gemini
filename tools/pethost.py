@@ -48,6 +48,8 @@ nv, ni, nb, nc, height, fps, eye_mode = struct.unpack_from('<IIIIffI', raw, 4)
 ex = 4 if raw[:4] == b'PET2' else 0
 fur = struct.unpack_from('<3f', raw, 32 + ex); lash = struct.unpack_from('<3f', raw, 44 + ex)
 vo = 56 + ex
+iris = struct.unpack_from('<4f', raw, vo) if eye_mode == 3 else (0, 0, 0, 0)
+if eye_mode == 3: vo += 16
 vbo = gl.glGenBuffers(1); gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo)
 gl.glBufferData(gl.GL_ARRAY_BUFFER, nv * 40, raw[vo:vo + nv * 40], gl.GL_STATIC_DRAW)
 ibo = gl.glGenBuffers(1); gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, ibo)
@@ -91,7 +93,7 @@ attr('aCol', 4, gl.GL_UNSIGNED_BYTE, True, 32); attr('aEye2', 2, gl.GL_SHORT, Fa
 gl.glUniform1i(U('uTex'), 0); gl.glUniform1i(U('uEyes'), 1)
 gl.glActiveTexture(gl.GL_TEXTURE0); gl.glBindTexture(gl.GL_TEXTURE_2D, t0)
 gl.glActiveTexture(gl.GL_TEXTURE1); gl.glBindTexture(gl.GL_TEXTURE_2D, t1)
-gl.glUniform1f(U('uEyeMode'), float(eye_mode)); gl.glUniform3f(U('uFur'), *fur); gl.glUniform3f(U('uLash'), *lash)
+gl.glUniform1f(U('uEyeMode'), float(eye_mode)); gl.glUniform4f(U('uIris'), *iris); gl.glUniform3f(U('uFur'), *fur); gl.glUniform3f(U('uLash'), *lash)
 gl.glUniform3f(U('uLightDir'), 0.45, 0.65, 0.62); gl.glUniform1f(U('uDim'), 0); gl.glUniform1f(U('uGlow'), 0)
 gl.glUniform3f(U('uScreenHalf'), 0.244, 0.142, 0)
 gl.glUniformMatrix4fv(U('uVP'), 1, True, VP)

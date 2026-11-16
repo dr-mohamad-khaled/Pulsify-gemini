@@ -33,7 +33,7 @@ class Pet3D(private val context: Context) {
     var nBones = 0; private set
     var height = 1f; private set
     var eyeMode = 0; private set
-    private val fur = FloatArray(3); private val lash = FloatArray(3)
+    private val fur = FloatArray(3); private val lash = FloatArray(3); private val iris = FloatArray(4)
     val clips = HashMap<String, PetClip>()
 
     // offscreen sprite
@@ -59,7 +59,7 @@ class Pet3D(private val context: Context) {
     fun create() {
         prog = Gl.program(asset("shaders/pet.vert"), asset("shaders/pet.frag"))
         uni["uB"] = GLES20.glGetUniformLocation(prog, "uB[0]").let { if (it >= 0) it else GLES20.glGetUniformLocation(prog, "uB") }
-        for (n in listOf("uVP", "uModel", "uTex", "uEyes", "uEyeMode", "uEyeL", "uEyeR", "uMood", "uFace", "uFur", "uLash",
+        for (n in listOf("uVP", "uModel", "uTex", "uEyes", "uEyeMode", "uEyeL", "uEyeR", "uMood", "uIris", "uFace", "uFur", "uLash",
             "uLightDir", "uDim", "uGlow", "uScreenHalf")) uni[n] = GLES20.glGetUniformLocation(prog, n)
         for (n in listOf("aNrm", "aUv", "aEye", "aBone", "aWeight", "aCol", "aEye2")) uni[n] = GLES20.glGetAttribLocation(prog, n)
         fxProg = Gl.program(asset("shaders/kitfx.vert"), asset("shaders/kitfx.frag"))
@@ -93,6 +93,7 @@ class Pet3D(private val context: Context) {
         nCtl = if (ver >= 2) bb.int else 8
         for (i in 0 until 3) fur[i] = bb.float
         for (i in 0 until 3) lash[i] = bb.float
+        if (eyeMode == 3) for (i in 0 until 4) iris[i] = bb.float
         val vOff = bb.position()
         val vbuf = ByteBuffer.allocateDirect(nv * 40).order(ByteOrder.nativeOrder()); vbuf.put(bytes, vOff, nv * 40); vbuf.position(0)
         val iOff = vOff + nv * 40
@@ -118,14 +119,15 @@ class Pet3D(private val context: Context) {
             clips[nm] = PetClip(nm, frames, loop, mats, ctl, fps, nCtl)
         }
         tex = texture("pets/$name.jpg")
-        eyeTex = if (eyeMode == 1) texture("pets/${name}_eyes.png") else 0
+        eyeTex = if (eyeMode == 1 || eyeMode == 3) texture("pets/${name}_eyes.png", straightAlpha = eyeMode == 3) else 0
         loaded = name
         // rest pose until the scene poses it
         for (b in 0 until MAX_BONES) { val o = b * 12; java.util.Arrays.fill(pose, o, o + 12, 0f); pose[o] = 1f; pose[o + 5] = 1f; pose[o + 10] = 1f }
     }
 
-    private fun texture(path: String): Int {
-        val bmp = context.assets.open(path).use { BitmapFactory.decodeStream(it) }
+    private fun texture(path: String, straightAlpha: Boolean = false): Int {
+        val opts = BitmapFactory.Options().apply { inPremultiplied = !straightAlpha }
+        val bmp = context.assets.open(path).use { BitmapFactory.decodeStream(it, null, opts) }!!
         val t = IntArray(1); GLES20.glGenTextures(1, t, 0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, t[0])
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR_MIPMAP_LINEAR)
@@ -210,6 +212,7 @@ class Pet3D(private val context: Context) {
         GLES20.glUniform4fv(uni["uEyeL"]!!, 1, eyeL, 0); GLES20.glUniform4fv(uni["uEyeR"]!!, 1, eyeR, 0)
         GLES20.glUniform2f(uni["uMood"]!!, mood[0], mood[1])
         GLES20.glUniform2f(uni["uFace"]!!, face, facePhase)
+        GLES20.glUniform4fv(uni["uIris"]!!, 1, iris, 0)
         GLES20.glUniform3fv(uni["uFur"]!!, 1, fur, 0); GLES20.glUniform3fv(uni["uLash"]!!, 1, lash, 0)
         GLES20.glUniform3f(uni["uLightDir"]!!, 0.45f, 0.65f, 0.62f)
         GLES20.glUniform1f(uni["uDim"]!!, dim); GLES20.glUniform1f(uni["uGlow"]!!, glow)

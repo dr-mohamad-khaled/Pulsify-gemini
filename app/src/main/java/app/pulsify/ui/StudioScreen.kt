@@ -378,12 +378,14 @@ private fun LookPanel(state: AppState) {
             OrbRow(info.coats.map { Color(it.base) to Color(it.rim) }, state.coat) { state.applyCoat(it) }
             Gap(10.dp)
         }
-        PanelTitle("Glow colour", if (state.accent == 0) "From the wallpaper" else "")
-        OrbRow(
-            ACCENT_PRESETS.map { if (it == 0) c.accent to c.accent2 else Color(it) to Color(app.pulsify.engine.SkyScene.shiftHue(it, 38f)) },
-            ACCENT_PRESETS.indexOf(state.accent).coerceAtLeast(0), small = true,
-        ) { state.applyAccent(ACCENT_PRESETS[it]) }
-        Gap(6.dp)
+        if (state.glowMatters) {
+            PanelTitle("Glow colour", if (state.accent == 0) "From the wallpaper" else "")
+            OrbRow(
+                ACCENT_PRESETS.map { if (it == 0) c.accent to c.accent2 else Color(it) to Color(app.pulsify.engine.SkyScene.shiftHue(it, 38f)) },
+                ACCENT_PRESETS.indexOf(state.accent).coerceAtLeast(0), small = true,
+            ) { state.applyAccent(ACCENT_PRESETS[it]) }
+            Gap(6.dp)
+        }
         BrightnessLine(state)
     }
 }

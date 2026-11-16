@@ -41,14 +41,15 @@ val PET_KITTEN = PetSpecies(
     mapOf("pounce" to "Jump", "zoomies" to "Spin", "purr" to "Pet", "groom" to "PawLift", "loaf" to "Sleep", "box" to "Sleep",
         "trill" to "HeadTilt", "stretch" to "Stretch", "knock" to "Poke", "cucumber" to "Poke"),
 )
+/** Blizzard the husky (Kalboob's 3D look): Meshy quadruped rig + Meshy motions + hand-made acting, layered eyes. */
 val PET_PUPPY = PetSpecies(
-    "puppy", "Hop", 0.6f,
-    listOf("LookAround" to 3f, "HeadTilt" to 2.5f, "EarTwitch" to 1.5f, "TailWag" to 2.5f, "PawLift" to 2f, "Stretch" to 1.2f, "Happy" to 1.5f,
-        "Spin" to 1f, "DrinkMilk" to 1.5f, "ChewBone" to 1.8f, "PlayBall" to 1.8f, "ChaseButterfly" to 1.5f, "Shake" to 1f,
-        "Sneeze" to 0.6f, "Sniff" to 1.2f, "Beg" to 1.2f),
-    "TailWag", "Happy", "Happy", "Spin",
-    mapOf("fetch" to "PlayBall", "paw" to "PawLift", "belly" to "Pet", "dig" to "Sniff", "howl" to "HeadTilt", "butterfly" to "ChaseButterfly",
-        "zoomies" to "Spin", "yawn" to "Stretch"),
+    "husky", "Walk", 0.5f,
+    listOf("LookAround" to 2.5f, "HeadTilt" to 2f, "Wag" to 2.5f, "Bark" to 1.6f, "Howl" to 1f, "PlayBow" to 1.5f, "Shake" to 1.2f,
+        "Dig" to 1.2f, "Fetch" to 1.5f, "Eat" to 1.3f, "ChewBone" to 1.3f, "ChaseButterfly" to 1.3f, "Spin" to 0.8f),
+    "Wag", "Eat", "Dance", "Howl",
+    mapOf("fetch" to "Fetch", "paw" to "PlayBow", "belly" to "Pet", "dig" to "Dig", "howl" to "Howl", "butterfly" to "ChaseButterfly",
+        "zoomies" to "Spin", "yawn" to "Shake"),
+    dances = listOf("Dance", "Dance2"), run = "Run", runSpeed = 1.2f, ownFace = true, angry = "Bark",
 )
 /** Snowy v2: Meshy auto-rig + Meshy motions + hand-made acting (face moods, beak, props). */
 val PET_DUCK = PetSpecies(

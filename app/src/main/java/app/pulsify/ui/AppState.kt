@@ -87,6 +87,16 @@ class AppState {
     fun applyKiwiWords(v: String) { Pulse.prefs.kiwiWords = v }
 
 
+    /** The wallpaper's glow colour only shows on the sky shaders (skies, and creature worlds set to a sky)
+     *  and on Kiwi's rim light; everywhere else the picker would do nothing, so we hide it. */
+    val glowMatters: Boolean
+        get() {
+            if (video >= 0) return false
+            val info = app.pulsify.engine.creatureInfo(character) ?: return true
+            if (info.id == 4) return true
+            return (info.envs.getOrNull(env)?.world ?: 0) < 0
+        }
+
     val accentPair: Pair<Color, Color>
         get() {
             val v = SKY_VARIANTS[variant.coerceIn(0, SKY_VARIANTS.size - 1)]

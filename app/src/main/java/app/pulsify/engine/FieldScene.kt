@@ -54,7 +54,7 @@ class FieldScene(val kind: Int) {
 
     fun size(width: Int, height: Int) {
         w = max(1, width); h = max(1, height)
-        val nw = if (kind == LIQUID) 260 else 220
+        val nw = if (kind == LIQUID) 448 else 220   // liquid: fine grid so the ripples stay silky on 1440p screens
         val nh = (nw * h.toFloat() / w).toInt().coerceIn(nw, nw * 3)
         if (nw == sw && nh == sh) return
         freeTargets()
@@ -173,8 +173,8 @@ class FieldScene(val kind: Int) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(0)
         GLES20.glVertexAttribPointer(0, 2, GLES20.GL_FLOAT, false, 0, 0)
-        // Simulation steps (two per frame for the water; one for light).
-        val steps = if (kind == LIQUID) 2 else 1
+        // Simulation steps (three per frame for the finer water grid, so waves travel as fast as before; one for light).
+        val steps = if (kind == LIQUID) 3 else 1
         GLES20.glViewport(0, 0, sw, sh)
         GLES20.glUseProgram(simProg)
         for (s in 0 until steps) {
@@ -193,7 +193,7 @@ class FieldScene(val kind: Int) {
             GLES20.glUniform1i(su["uState"]!!, 0)
             GLES20.glUniform2f(su["uTexel"]!!, 1f / sw, 1f / sh)
             GLES20.glUniform1f(su["uAspect"]!!, w.toFloat() / h)
-            GLES20.glUniform1f(su["uDamp"]!!, 0.992f)
+            GLES20.glUniform1f(su["uDamp"]!!, if (kind == LIQUID) 0.9947f else 0.992f)
             GLES20.glUniform1f(su["uDecay"]!!, if (input.audio.active) 0.965f else 0.978f)
             GLES20.glUniform1f(su["uTime"]!!, time)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
@@ -264,7 +264,7 @@ void main(){
   vel += (avg - hgt) * 2.0;
   vel *= uDamp;
   hgt += vel;
-  hgt *= 0.9993;
+  hgt *= 0.99953;
   for (int i = 0; i < 8; i++) {
     if (float(i) < uN) {
       vec4 a = uQ[i * 2]; vec4 b = uQ[i * 2 + 1];
@@ -294,7 +294,7 @@ float H(vec2 uv){
 }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main(){
-  vec2 e = uTexel * 0.75;
+  vec2 e = uTexel * 1.3;
   float hx = H(vUv + vec2(e.x, 0.0)) - H(vUv - vec2(e.x, 0.0));
   float hy = H(vUv + vec2(0.0, e.y)) - H(vUv - vec2(0.0, e.y));
   float h0 = H(vUv);
