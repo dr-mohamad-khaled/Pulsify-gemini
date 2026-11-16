@@ -36,6 +36,7 @@ class WorldScene(private val context: Context) {
     private var strip = 0
     private var time = 0f
     private var par = 0f
+    private var tiltX = 0f; private var tiltY = 0f
 
     private val bursts = FloatArray(12)
     private var nextBurst = 0
@@ -50,6 +51,11 @@ class WorldScene(private val context: Context) {
     private var imageMode = false
     private var hasNightImg = false
     private var groundFrac = 0.75f
+    // Photo worlds (id >= 40): four pictures (morning, noon, sunset, night) blended by the clock.
+    private var phaseMode = false
+    private var phaseSpec: PhotoWorld? = null
+    private val phaseTex = HashMap<Int, Int>()
+    private var zoom = 1f
     /** The ground line in uv for the current image world (NaN when the world has no picture). */
     var groundY = Float.NaN; private set
 
@@ -67,7 +73,8 @@ class WorldScene(private val context: Context) {
             imgProg = Gl.program(vert, context.assets.open("shaders/imgworld.frag").bufferedReader().use { it.readText() })
             for (n in listOf("uDay", "uNight", "uRes", "uMap", "uNightK", "uDusk", "uHasNight")) iu[n] = GLES20.glGetUniformLocation(imgProg, n)
         } catch (t: Throwable) { imgProg = 0; Log.w("Pulsify", "image worlds off", t) }
-        for (n in listOf("uTex", "uRes", "uHalf", "uFloor", "uTime", "uWorld", "uNight", "uBass", "uTreble", "uBeat", "uPar", "uBurst", "uBright", "uDim")) {
+        for (n in listOf("uTex", "uRes", "uHalf", "uFloor", "uTime", "uWorld", "uNight", "uBass", "uTreble", "uBeat", "uPar", "uBurst", "uBright", "uDim",
+                "uFx", "uHorizon", "uTilt", "uZoom", "uRays", "uSky")) {
             ou[n] = GLES20.glGetUniformLocation(overlayProg, n)
         }
         val ids = IntArray(1)
@@ -129,6 +136,8 @@ class WorldScene(private val context: Context) {
             if (bursts[k + 3] > 0f) { bursts[k + 2] += dt; if (bursts[k + 2] > 1.6f) bursts[k + 3] = 0f }
         }
         par += (input.parallax - par) * min(1f, dt * 6f)
+        tiltX += (input.tiltX - tiltX) * min(1f, dt * 5f); tiltY += (input.tiltY - tiltY) * min(1f, dt * 5f)
+        if (phaseMode && (kotlin.math.abs(input.tiltX) > 0.02f || kotlin.math.abs(input.tiltY) > 0.02f)) sinceTouch = kotlin.math.min(sinceTouch, 0.5f)
         // Re-render the cached painting when the world changes or the clock moves on 5 minutes.
         val bucket = (input.hour * 12f).toInt()
         if (!dirty && (input.world != cachedWorld || bucket != cachedHourBucket)) { dirty = true; strip = 0 }
@@ -141,9 +150,19 @@ class WorldScene(private val context: Context) {
         freeImages()
         val spec = WORLD_IMAGES[world]
         val wasImage = imageMode
-        imageMode = false
+        imageMode = false; phaseMode = false; phaseSpec = null; zoom = 1f
         groundY = Float.NaN
-        if (spec != null && imgProg != 0) {
+        val photo = PHOTO_WORLDS[world]
+        if (photo != null && imgProg != 0) {
+            try {
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.assets.open("worlds/p${world}_1.webp").use { android.graphics.BitmapFactory.decodeStream(it, null, o) }
+                if (o.outWidth > 0) {
+                    imgW = o.outWidth; imgH = o.outHeight
+                    groundFrac = photo.ground; phaseSpec = photo; phaseMode = true; imageMode = true; hasNightImg = true; zoom = ZOOM
+                }
+            } catch (t: Throwable) { Log.w("Pulsify", "photo world $world failed", t); phaseMode = false }
+        } else if (spec != null && imgProg != 0) {
             try {
                 // Only the size now; the pictures are decoded when the painting is drawn, and only
                 // the ones the time of day needs (one at noon or midnight, both at dusk).
@@ -183,6 +202,8 @@ class WorldScene(private val context: Context) {
         if (dayTex != 0) GLES20.glDeleteTextures(1, intArrayOf(dayTex), 0)
         if (nightTex != 0) GLES20.glDeleteTextures(1, intArrayOf(nightTex), 0)
         dayTex = 0; nightTex = 0
+        for (t in phaseTex.values) GLES20.glDeleteTextures(1, intArrayOf(t), 0)
+        phaseTex.clear()
     }
 
     // Cover mapping: the picture fills the screen without stretching. Tall screens crop the sides;
@@ -198,7 +219,7 @@ class WorldScene(private val context: Context) {
         if (!imageMode) { groundY = Float.NaN; return }
         computeMap()
         val vImg = 1f - groundFrac
-        val vScreen = (vImg - map[3]) / map[1]
+        val vScreen = ((vImg - map[3]) / map[1] - 0.5f) / zoom + 0.5f
         val halfH = 0.5f * h / min(w, h)
         groundY = (vScreen - 0.5f) * 2f * halfH
     }
@@ -211,6 +232,26 @@ class WorldScene(private val context: Context) {
     }
 
     private fun drawWorld(input: SceneInput, rw: Int, rh: Int) {
+        if (phaseMode) {
+            val (pa, pb, k) = phasePair(input.hour)
+            val need = if (k > 0.001f) setOf(pa, pb) else setOf(pa)
+            for (key in phaseTex.keys.toList()) if (key !in need) { GLES20.glDeleteTextures(1, intArrayOf(phaseTex[key]!!), 0); phaseTex.remove(key) }
+            for (key in need) if (key !in phaseTex) decode("worlds/p${loadedWorld}_$key.webp")?.let { phaseTex[key] = upload(it); it.recycle() }
+            val ta = phaseTex[pa] ?: phaseTex.values.firstOrNull()
+            val tb = phaseTex[pb] ?: ta
+            if (ta == null) { GLES20.glClearColor(0f, 0f, 0f, 1f); GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT); return }
+            bindTri(imgProg); computeMap()
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ta); GLES20.glUniform1i(iu["uDay"]!!, 0)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE1); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tb!!); GLES20.glUniform1i(iu["uNight"]!!, 1)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glUniform2f(iu["uRes"]!!, rw.toFloat(), rh.toFloat())
+            GLES20.glUniform4f(iu["uMap"]!!, map[0], map[1], map[2], map[3])
+            GLES20.glUniform1f(iu["uNightK"]!!, k)
+            GLES20.glUniform1f(iu["uDusk"]!!, 0f)
+            GLES20.glUniform1f(iu["uHasNight"]!!, 1f)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
+            return
+        }
         if (imageMode) {
             val nk = nightAmount(input.hour)
             val needDay = nk < 0.999f || !hasNightImg
@@ -314,6 +355,17 @@ class WorldScene(private val context: Context) {
         GLES20.glUniform4fv(ou["uBurst"]!!, 3, burstBuf)
         GLES20.glUniform1f(ou["uBright"]!!, input.brightness)
         GLES20.glUniform1f(ou["uDim"]!!, if (input.lowBattery) 0.4f else 0f)
+        val ps = phaseSpec
+        GLES20.glUniform1f(ou["uFx"]!!, (ps?.fx ?: 0).toFloat())
+        GLES20.glUniform1f(ou["uZoom"]!!, zoom)
+        GLES20.glUniform2f(ou["uTilt"]!!, tiltX, tiltY)
+        GLES20.glUniform1f(ou["uSky"]!!, if (ps?.sky == true) 1f else 0f)
+        GLES20.glUniform1f(ou["uRays"]!!, if (ps?.sky == true) duskAmount(input.hour) * (1f - nightAmount(input.hour) * 0.8f) else 0f)
+        if (ps != null) {
+            computeMap()
+            val vS = ((1f - ps.horizon - map[3]) / map[1] - 0.5f) / zoom + 0.5f
+            GLES20.glUniform1f(ou["uHorizon"]!!, (vS - 0.5f) * 2f * (0.5f * h / m))
+        } else GLES20.glUniform1f(ou["uHorizon"]!!, 0f)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
     }
 
@@ -350,6 +402,51 @@ class WorldScene(private val context: Context) {
         /** World id -> where the creature's feet touch the picture (fraction from the top). */
         val WORLD_IMAGES: Map<Int, Float> = mapOf(1 to 0.8f, 2 to 0.82f, 3 to 0.8f, 4 to 0.8f, 5 to 0.79f, 6 to 0.83f, 7 to 0.79f, 8 to 0.83f, 9 to 0.86f, 10 to 0.84f, 11 to 0.84f, 12 to 0.86f, 13 to 0.86f, 14 to 0.86f, 15 to 0.85f, 16 to 0.81f, 17 to 0.83f,
             18 to 0.82f, 19 to 0.83f, 20 to 0.82f, 21 to 0.83f, 22 to 0.84f, 23 to 0.84f, 24 to 0.83f, 25 to 0.74f, 26 to 0.78f, 27 to 0.82f)
+
+        private const val ZOOM = 0.94f
+
+        /** The picture that stands for a world in posters and widget cards. */
+        fun worldAsset(world: Int, night: Boolean): String =
+            if (world in PHOTO_WORLDS) "worlds/p${world}_${if (night) 4 else 2}.webp" else "worlds/w${world}_${if (night) "night" else "day"}.jpg"
+        fun groundOf(world: Int): Float = PHOTO_WORLDS[world]?.ground ?: WORLD_IMAGES[world] ?: 0.82f
+
+        /** Which two pictures to blend at this hour (1 morning, 2 noon, 3 sunset, 4 night) and how far. */
+        fun phasePair(hour: Float): Triple<Int, Int, Float> = when {
+            hour < 5f -> Triple(4, 4, 0f)
+            hour < 7.5f -> Triple(4, 1, smooth(5f, 7.5f, hour))
+            hour < 9f -> Triple(1, 1, 0f)
+            hour < 11.5f -> Triple(1, 2, smooth(9f, 11.5f, hour))
+            hour < 15.5f -> Triple(2, 2, 0f)
+            hour < 17.8f -> Triple(2, 3, smooth(15.5f, 17.8f, hour))
+            hour < 18.8f -> Triple(3, 3, 0f)
+            hour < 20.5f -> Triple(3, 4, smooth(18.8f, 20.5f, hour))
+            else -> Triple(4, 4, 0f)
+        }
+
+        /** Photo worlds: feet line and horizon (fractions of the picture height from the top), effect, open sky. */
+        data class PhotoWorld(val ground: Float, val horizon: Float, val fx: Int, val sky: Boolean = true)
+        val PHOTO_WORLDS: Map<Int, PhotoWorld> = mapOf(
+            40 to PhotoWorld(0.80f, 0.58f, 4),              // Backyard
+            41 to PhotoWorld(0.80f, 0.56f, 3),              // Snowy Cabin
+            42 to PhotoWorld(0.80f, 0.55f, 6, sky = false), // Living Room
+            43 to PhotoWorld(0.80f, 0.55f, 4),              // Rooftop Garden
+            44 to PhotoWorld(0.80f, 0.56f, 4),              // Rainforest Clearing
+            45 to PhotoWorld(0.80f, 0.55f, 10),             // Tropical Beach
+            46 to PhotoWorld(0.80f, 0.56f, 4),              // Pond Meadow
+            47 to PhotoWorld(0.80f, 0.56f, 1),              // Blossom Garden
+            48 to PhotoWorld(0.80f, 0.56f, 2),              // Autumn Forest
+            49 to PhotoWorld(0.80f, 0.56f, 4),              // City Park
+            50 to PhotoWorld(0.80f, 0.55f, 6, sky = false), // Workshop
+            51 to PhotoWorld(0.80f, 0.56f, 8),              // Moon Base
+            52 to PhotoWorld(0.80f, 0.56f, 9),              // Spooky Graveyard
+            53 to PhotoWorld(0.80f, 0.56f, 9),              // Pumpkin Patch
+            54 to PhotoWorld(0.82f, 0.52f, 5, sky = false), // Coral Reef
+            55 to PhotoWorld(0.82f, 0.52f, 5, sky = false), // Sunken Ship
+            56 to PhotoWorld(0.80f, 0.56f, 7),              // Candy Land
+            57 to PhotoWorld(0.80f, 0.56f, 7),              // Cloud Nursery
+            58 to PhotoWorld(0.80f, 0.56f, 4),              // Savanna
+            59 to PhotoWorld(0.80f, 0.56f, 10),             // Watering Hole
+        )
 
         private fun smooth(a: Float, b: Float, x: Float): Float {
             val t = ((x - a) / (b - a)).coerceIn(0f, 1f)

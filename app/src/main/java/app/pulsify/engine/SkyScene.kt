@@ -29,6 +29,7 @@ class SceneInput {
     var battery = 1f
     var lowBattery = false
     var parallax = 0f        // -1..1 from home-screen pages
+    var tiltX = 0f; var tiltY = 0f   // phone tilt changes (-1..1), for depth parallax
     var kiwiWords = ""       // words the user taught Kiwi, comma separated
     var bgColor = 0xFF000000.toInt()   // background for the plain-colour world
     var style = 0            // creature look: 0 = 2D, 1.. = 3D body shapes (Kitty)

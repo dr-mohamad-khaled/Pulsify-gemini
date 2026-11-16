@@ -66,6 +66,8 @@ import app.pulsify.ui.pressable
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    override fun onResume() { super.onResume(); app.pulsify.core.Tilt.start(applicationContext) }
+    override fun onPause() { app.pulsify.core.Tilt.stop(); super.onPause() }
     override fun onCreate(savedInstanceState: Bundle?) {
         Pulse.init(this)
         enableEdgeToEdge(

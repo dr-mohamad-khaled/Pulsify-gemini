@@ -37,6 +37,7 @@ class PulsifyWallpaperService : WallpaperService() {
         private var baseH = 0
         private var visible = false
         private var audioHeld = false
+        private var tiltOn = false
         @Volatile private var gone = false
 
         private val loop = GlLoop(
@@ -109,6 +110,7 @@ class PulsifyWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(isVisible: Boolean) {
             visible = isVisible
             try {
+                if (isVisible != tiltOn) { tiltOn = isVisible; if (isVisible) app.pulsify.core.Tilt.start(applicationContext) else app.pulsify.core.Tilt.stop() }
                 if (isVisible) {
                     if (!audioHeld) { Pulse.audio.acquire(); audioHeld = true }
                     feed.hidden = try { keyguard.isKeyguardLocked } catch (_: Throwable) { false }
@@ -156,6 +158,7 @@ class PulsifyWallpaperService : WallpaperService() {
             Pulse.removeSettingsListener(settingsListener)
             try { unregisterReceiver(unlockReceiver) } catch (_: Throwable) {}
             if (audioHeld) { Pulse.audio.release(); audioHeld = false }
+            if (tiltOn) { tiltOn = false; app.pulsify.core.Tilt.stop() }
             loop.quit(waitMs = 300)
             super.onDestroy()
         }

@@ -459,7 +459,7 @@ private fun WorldPanel(state: AppState) {
         LazyRow(state = ls, contentPadding = PaddingValues(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             itemsIndexed(info.envs) { i, e ->
                 Poster(
-                    if (e.world >= 0 && e.world != app.pulsify.engine.SOLID_WORLD) "worlds/w${e.world}_${if (night) "night" else "day"}.jpg" else null,
+                    if (e.world >= 0 && e.world != app.pulsify.engine.SOLID_WORLD) app.pulsify.engine.WorldScene.worldAsset(e.world, night) else null,
                     e.name, i == state.env,
                     if (e.world == app.pulsify.engine.SOLID_WORLD) Color(state.bgColor) else Color(e.c1),
                     if (e.world == app.pulsify.engine.SOLID_WORLD) Color(state.bgColor) else Color(e.c2), skyStyle = e.skyVariant,

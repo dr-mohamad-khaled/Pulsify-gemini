@@ -1010,10 +1010,10 @@ void main(){
         b.cardOk = -1
         if (env == null || b.w < 8f || b.h < 8f) return
         try {
-            val ground = WorldScene.WORLD_IMAGES[env.world] ?: 0.82f
-            val name = if (night) "worlds/w${env.world}_night.jpg" else "worlds/w${env.world}_day.jpg"
+            val ground = WorldScene.groundOf(env.world)
+            val name = WorldScene.worldAsset(env.world, night)
             val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
-            val src = (try { context.assets.open(name) } catch (_: Throwable) { context.assets.open("worlds/w${env.world}_day.jpg") })
+            val src = (try { context.assets.open(name) } catch (_: Throwable) { context.assets.open(WorldScene.worldAsset(env.world, false)) })
                 .use { android.graphics.BitmapFactory.decodeStream(it, null, opts) } ?: return
             val a = b.w / b.h
             var cw = src.width * 0.78f; var ch = cw / a

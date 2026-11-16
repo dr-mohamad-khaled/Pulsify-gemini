@@ -124,6 +124,7 @@ object Pulse {
         i.accent = s.accent
         i.brightness = s.brightness
         i.parallax = parallax
+        i.tiltX = Tilt.x; i.tiltY = Tilt.y
         i.kiwiWords = s.kiwiWords
         i.mood = (if (preview && ph < 0f) previewMood else null) ?: when (i.hour.toInt()) {
             in 5..9 -> Mood.MORNING
