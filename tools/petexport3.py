@@ -10,7 +10,9 @@ PET2 = PET1 plus a control count:
 Controls (12): blinkL, blinkR, lookXL, lookYL, lookXR, lookYR, expr, phase, tilt, happy, pupil, spare.
 Frames are every other baked frame (15 fps).
 """
-import bpy, sys, json, math, struct, os
+import bpy
+import sys, json, math, struct, os
+from mathutils import Vector
 import numpy as np
 
 blend, baked, face_json, out_dir, name, cfg_json = sys.argv[sys.argv.index('--') + 1:]
@@ -57,6 +59,15 @@ for o in meshes:
     col = me.color_attributes.get('Col')
     gnames = {g.index: g.name for g in o.vertex_groups}
     gloss = int(CFG.get('gloss', 0.12) * 255) if body else 140
+    # smoothed normals: Meshy meshes carry fine geometric noise that sparkles under rim / specular light
+    NS = CFG.get('smooth', 3) if body else 0
+    nrm = np.array([tuple(v.normal) for v in me.vertices], np.float32)
+    if NS:
+        ed = np.array([tuple(e.vertices) for e in me.edges], np.int64)
+        for _ in range(NS):
+            acc = nrm.copy()
+            np.add.at(acc, ed[:, 0], nrm[ed[:, 1]]); np.add.at(acc, ed[:, 1], nrm[ed[:, 0]])
+            nrm = acc / np.maximum(1e-6, np.linalg.norm(acc, axis=1, keepdims=True))
     vw = []
     for v in me.vertices:
         ws = [(bidx[gnames[g.group]], g.weight) for g in v.groups if gnames.get(g.group) in bidx and g.weight > 0.001]
@@ -77,7 +88,7 @@ for o in meshes:
             c = tuple(col.data[vi].color) if col is not None else (0, 0, 0, 0)
             key = (o.name, vi, round(uv[0], 5), round(uv[1], 5), eid)
             if key not in vmap:
-                n = v.normal
+                n = Vector(nrm[vi])
                 cc = [int(max(0, min(1, x ** (1 / 2.2))) * 255) for x in c[:3]]
                 verts.append((tuple(c_ * SCALE for c_ in v.co), (n.x, n.y, n.z), gloss, uv, vw[vi][0], vw[vi][1], (cc[0], cc[1], cc[2], 0 if body else 255), eid))
                 vmap[key] = len(verts) - 1

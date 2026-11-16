@@ -102,6 +102,11 @@ class Ctx:
             if self.flap[s]: q = Quaternion((0, 1, 0), math.radians(self.flap[s] * sx)) @ q
             if self.sweep[s]: q = Quaternion((0, 0, 1), math.radians(self.sweep[s] * sx)) @ q
             self.turns.append((ch[0], q))
+            # a folded wing's feather fan closes: squeeze the outer wing across its width
+            if not hasattr(self, 'scales'): self.scales = []
+            nz = 1.0 - 0.55 * k * max(0.0, 1.0 - abs(self.lift[s]) / 25.0)
+            self.scales.append((ch[1], (1.0 - 0.25 * k, 1.0, nz)))
+            self.scales.append((ch[0], (1.0, 1.0, 1.0 - 0.25 * k)))
             if self.tip[s]:
                 for b in ch[2:]: self.turns.append((b, Quaternion((0, 1, 0), math.radians(self.tip[s] * sx / max(1, len(ch) - 2)))))
 
@@ -150,9 +155,15 @@ class Idle(Clip):
     def __init__(self): super().__init__('Idle', 7.2, loop=True)
     def pose(self, t, c):
         breathe(c, t); alive(c, t, 3, 0.8); c.crest(0.55 + 0.1 * sinp(t, 3.6))
-        c.tail(wag=3 * sinp(t, 3.6))
+        c.tail(wag=3 * sinp(t, 3.6), up=4 * env(t, 2.0, 2.05, 2.1, 2.3))
         k = env(t, 4.0, 4.15, 4.4, 4.6)              # a tiny wing shuffle
-        c.wings(lift=8 * k)
+        c.wings(lift=6 * k)
+        # weight shifts and little steps: birds never stand on locked legs
+        sh = sinp(t, 7.2); c.body(roll=4 * sh); c.leg('L', lift=0, bend=6 * max(0.0, sh)); c.leg('R', lift=0, bend=6 * max(0.0, -sh))
+        for side, a in (('L', 1.0), ('R', 1.5), ('L', 5.2)):
+            st = env(t, a, a + 0.12, a + 0.2, a + 0.35); c.leg(side, lift=22 * st, bend=35 * st)
+            c.body(roll=(-5 if side == 'L' else 5) * st)
+        c.crouch(0.08 + 0.05 * sinp(t, 2.4))
 
 
 class LookAround(Clip):
@@ -337,8 +348,8 @@ class Walk(Clip):
     def pose(self, t, c):
         ph = (t / 0.8) % 1.0; sw = math.sin(2 * math.pi * ph)
         lL = max(0.0, math.sin(2 * math.pi * ph)); lR = max(0.0, -math.sin(2 * math.pi * ph))
-        c.leg('L', lift=30 * lL, bend=35 * lL); c.leg('R', lift=30 * lR, bend=35 * lR)
-        c.body(roll=9 * sw, yaw=5 * sw); c.head(roll=-6 * sw, pitch=8 * abs(sw)); c.tail(wag=-8 * sw)
+        c.leg('L', lift=45 * lL, bend=55 * lL); c.leg('R', lift=45 * lR, bend=55 * lR)
+        c.body(roll=11 * sw, yaw=7 * sw); c.head(roll=-6 * sw, pitch=8 * abs(sw)); c.tail(wag=-8 * sw)
         c.root.z += 0.012 * abs(sw)
 
 
@@ -477,11 +488,12 @@ class Angry(Clip):
 
 
 class Dangle(Clip):
-    """Carried by the finger: wings flapping wildly, feet paddling."""
+    """Carried by the finger: wings flapping wildly, legs hanging straight down and kicking."""
     loop = True; group = 'touch'
     def __init__(self): super().__init__('Dangle', 0.3 * 6, loop=True)
     def pose(self, t, c):
-        c.flapping(t, 0.3, 65, 20); c.leg('L', lift=30 * sinp(t, 0.6), bend=40); c.leg('R', lift=-30 * sinp(t, 0.6), bend=40)
+        c.flapping(t, 0.3, 75, 20); c.leg('L', lift=-25 + 12 * sinp(t, 0.6), bend=-10); c.leg('R', lift=-25 - 12 * sinp(t, 0.6), bend=-10)
+        c.tail(up=-25)
         c.body(pitch=5 * sinp(t, 0.6)); c.head(yaw=15 * sinp(t, 0.9)); c.crest(1.0); c.tail(fan=1, wag=10 * sinp(t, 0.3))
 
 

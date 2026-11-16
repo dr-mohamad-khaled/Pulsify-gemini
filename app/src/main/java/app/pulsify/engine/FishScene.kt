@@ -68,7 +68,7 @@ class FishScene(private val context: Context) : Creature {
     override fun onSurfaceChanged(width: Int, height: Int) { w = max(1, width); h = max(1, height); layout() }
     override fun setGround(y: Float) {}
     private fun layout() {
-        size = min(0.42f, halfW * 0.78f)
+        size = min(0.55f * halfH, halfW * 1.1f)
         floorY = -halfH + bottomInset * 2f * halfH + size * 0.45f
         topY = halfH - size * 0.7f
         x = x.coerceIn(-halfW + size * 0.5f, halfW - size * 0.5f); y = y.coerceIn(floorY, topY)

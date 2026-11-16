@@ -86,7 +86,11 @@ class Idle(Clip):
     def act(self, t, c):
         breathe(c, t); c.tail(wag=10 * sinp(t, 2.4), up=10 + 6 * sinp(t, 3.6))
         c.head(yaw=18 * env(t, 1.2, 1.5, 2.6, 2.9) - 14 * env(t, 4.0, 4.3, 5.2, 5.5), roll=5 * sinp(t, 7.2))
-        c.ears(back=6 * env(t, 3.2, 3.3, 3.4, 3.6))
+        c.ears(back=6 * env(t, 3.2, 3.3, 3.4, 3.6) - 8 * env(t, 5.6, 5.65, 5.7, 5.85))
+        # never frozen: weight shifting paw to paw, a paw lift, tail tip flicks, sniffing nose bobs
+        sh = sinp(t, 7.2); c.body(roll=3 * sh, yaw=4 * sinp(t, 3.6)); c.turn('hips', 'Y', -2.5 * sh)
+        p = env(t, 2.2, 2.35, 2.55, 2.75); c.front('L', 18 * p, 40 * p)
+        c.tail(wag=14 * env(t, 0.6, 0.7, 0.8, 1.0) * sinp(t, 0.2)); c.head(pitch=4 * env(t % 2.4, 0.0, 0.1, 0.2, 0.3))
 
 
 class LookAround(Clip):
@@ -705,6 +709,21 @@ class PlayBall(PlayBall):
     def props(self, t, M):
         b, r = self.ball(t); return {'YarnBall': T(b + Vector((0, 0, 0.04))) @ Rx(r) @ Sc(1.6)}
 
+
+
+def hang(c, t, k=1.0):
+    """Held up by the scruff: the body hangs from the finger, legs and tail straight down, swaying limp."""
+    c.turn('hips', 'X', -62 * k); c.root.z -= 0.12 * k
+    for s, ph in (('L', 0.0), ('R', 0.5)):
+        c.front(s, -62 * k + 7 * sinp(t, 1.6, ph), 6); c.rear(s, -62 * k + 7 * sinp(t, 1.6, ph + 0.3), 4)
+    c.tail(up=-55 * k, wag=6 * sinp(t, 1.6)); c.head(pitch=44 * k, roll=5 * sinp(t, 3.2))
+
+
+class Dangle(Clip):
+    """Lifted by the finger: hangs limp under gravity, paws dangling, a resigned little sway."""
+    loop = True; group = 'touch'
+    def __init__(self): super().__init__('Dangle', 3.2, loop=True)
+    def act(self, t, c): hang(c, t)
 
 def library():
     return [Idle(), LookAround(), HeadTilt(), Yawn(), Sneeze(), Stretch(), Lounge(), Knead(), Groom(), Sit(), SitDown(), StandUp(),

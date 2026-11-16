@@ -155,15 +155,19 @@ class Pet3D(private val context: Context) {
     }
 
     fun ensureSprite(px: Int) {
-        val n = px.coerceIn(160, 1536)
-        if (fbo != 0 && kotlin.math.abs(n - spriteSize) < 32) return
+        // power-of-two so it can be mip-mapped: the sprite is drawn smaller than it is rendered, and
+        // trilinear filtering turns the supersampling into real anti-aliasing instead of sparkle
+        var n = 256
+        while (n < px && n < 2048) n *= 2
+        if (fbo != 0 && n == spriteSize) return
         freeSprite()
         spriteSize = n
         val ids = IntArray(1)
         GLES20.glGenTextures(1, ids, 0); colTex = ids[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, colTex)
         GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, n, n, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR_MIPMAP_LINEAR)
+        GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
@@ -244,6 +248,7 @@ class Pet3D(private val context: Context) {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, Gl.target)
         GLES20.glViewport(saveVp[0], saveVp[1], saveVp[2], saveVp[3])
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, colTex); GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D)
     }
 
     private fun attr(loc: Int, n: Int, type: Int, norm: Boolean, off: Int) {

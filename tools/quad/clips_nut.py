@@ -343,7 +343,11 @@ class Dangle(Clip):
     loop = True; group = 'touch'
     def __init__(self): super().__init__('Dangle', 1.2, loop=True)
     def act(self, t, c):
-        c.arms(20 + 25 * sinp(t, 0.3)); c.leg('L', 30 * sinp(t, 0.3), 40); c.leg('R', -30 * sinp(t, 0.3), 40); c.tail(wag=20 * sinp(t, 0.6), up=-30)
+        # held up under the arms: arms raised, legs and tail hanging straight down, little kicks
+        c.arms(95 + 5 * sinp(t, 1.2)); c.elbows(-10); c.head(pitch=8, roll=6 * sinp(t, 2.4))
+        k = env(t % 1.2, 0.0, 0.1, 0.2, 0.4)
+        c.leg('L', -8 + 18 * k * (1 if int(t / 1.2) % 2 == 0 else 0), 6); c.leg('R', -8 + 18 * k * (1 if int(t / 1.2) % 2 else 0), 6)
+        c.tail(wag=10 * sinp(t, 1.2), up=-45, curl=-20); c.root.z -= 0.04
 
 
 class Tumble(Clip):

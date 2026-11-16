@@ -15,13 +15,12 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Cosmo, falling forever through space. Stars and dust rush up past him, a planet or a comet drifts by
- * now and then, and he tumbles slowly the whole time.
- *  - Tap / touch: he falls HARDER: the stars streak, he flails and spins faster, then calms down again.
- *  - Swipe across him: he's flung sideways and drifts off to the next home-screen page (he lives in
- *    page space, so swiping your pages brings you to wherever he floated).
- *  - Left alone he waves, curls into a ball and somersaults, tries to swim, gives a thumbs up,
- *    or just leans back and enjoys the fall.
+ * Cosmo, an astronaut who has lost control and drifts through deep space. The universe streams past him
+ * (we fly forward through a warp of stars and nebula), he tumbles slowly and floats around the screen,
+ * bumping off its edges. Scrolling your home pages pushes him along: the screen edge knocks him back in.
+ *  - Tap him: he gets knocked away from your finger, spins, flails; the stars rush faster for a moment.
+ *  - Tap space: a little push away from that spot.  Swipe: flings him across.
+ *  - Left alone he waves, curls up and somersaults, tries to swim, thumbs-up, or just relaxes and drifts.
  */
 class AstroScene(private val context: Context) : Creature {
     override var listener: SceneListener? = null
@@ -35,11 +34,10 @@ class AstroScene(private val context: Context) : Creature {
     private val halfW get() = 0.5f * w / min(w, h)
     private val halfH get() = 0.5f * h / min(w, h)
 
-    // where he is: x in page units (0 = first page centre), y in screen uv
-    private var px = 0.5f; private var vx = 0f
-    private var y = 0f; private var vy = 0f
-    private var pagePos = 0f
-    private var pagesKnown = false
+    // where he is: screen uv (0 = centre), drifting with momentum, bouncing off the edges
+    private var x = 0f; private var vx = 0.05f
+    private var y = 0f; private var vy = 0.03f
+    private var pagePos = 0f; private var lastPage = Float.NaN; private var bumpT = -9f
     private var speed = 1f; private var fall = 0f
     private var spin = 0f; private var spinRate = 0.35f
     private var yawPh = 0f; private var shake = 0f
@@ -79,8 +77,8 @@ class AstroScene(private val context: Context) : Creature {
         cur = c; curT = 0f
     }
 
-    private val size get() = min(0.62f, halfW * 1.15f)
-    private fun screenX(): Float = (px - pagePos) * 2f * halfW
+    private val size get() = min(0.6f * halfH, halfW * 1.15f)
+    private fun screenX(): Float = x
     private fun hit(nx: Float, ny: Float): Boolean {
         val ux = (nx - 0.5f) * 2f * halfW; val uy = (0.5f - ny) * 2f * halfH
         return hypot(ux - screenX(), uy - y) < size * 0.6f
@@ -103,8 +101,8 @@ class AstroScene(private val context: Context) : Creature {
         val dist = hypot(lx - dx, ly - dy)
         if (dist > 0.12f && time - downT < 0.6f && abs(mvx) > 0.6f) {
             // a swipe: fling him off sideways toward the next page
-            vx = sign(mvx) * min(3.2f, 1.1f + abs(mvx) * 0.35f)
-            vy += -mvy * 0.15f
+            vx = (mvx * 2f * halfW * 0.35f).coerceIn(-2.4f, 2.4f)
+            vy = (-mvy * 2f * halfH * 0.35f).coerceIn(-2.4f, 2.4f)
             spinRate += sign(mvx) * 3f
             play("Flail"); boost(1.5f)
             if (!flung) { flung = true; listener?.onDiscovery("cosmo fling") }
@@ -113,10 +111,14 @@ class AstroScene(private val context: Context) : Creature {
         return false
     }
     override fun tapAt(nx: Float, ny: Float): Boolean {
-        boost(if (hit(nx, ny)) 3.2f else 2f)
-        play(if (hit(nx, ny)) "Poke" else "Flail")
-        val ux = (nx - 0.5f) * 2f * halfW
-        vx += (screenX() - ux) * 0.4f
+        val onHim = hit(nx, ny)
+        boost(if (onHim) 3.2f else 1.2f)
+        play(if (onHim) "Poke" else "Flail")
+        // pushed away from the finger, harder the closer it was
+        val ux = (nx - 0.5f) * 2f * halfW; val uy = (0.5f - ny) * 2f * halfH
+        val dx = x - ux; val dy = y - uy; val d = max(0.05f, hypot(dx, dy))
+        val k = (if (onHim) 1.1f else 0.5f) / (0.4f + d)
+        vx += dx / d * k; vy += dy / d * k
         return true
     }
     override fun longPressAt(nx: Float, ny: Float): Boolean { boost(4f); play("Flail"); return true }
@@ -139,35 +141,48 @@ class AstroScene(private val context: Context) : Creature {
     // ---------------------------------------------------------------- update
     override fun update(dt: Float, input: SceneInput) {
         time += dt
-        pagesKnown = abs(input.pagePos) > 0.001f || pagesKnown
-        pagePos += (input.pagePos - pagePos) * min(1f, dt * 12f)
-        // falling speed: calm 1, boosted by touches, decays back
+        // the warp: calm drift speed 1, kicked up by touches and the bass, settling back
         speed += (1f - speed) * min(1f, dt * 0.6f)
         if (input.audio.active) speed = max(speed, 1f + input.audio.bass * 2.5f)
         fall += speed * dt
         shake *= exp(-dt * 3f)
-        // tumble
-        spinRate += ((if (spinRate >= 0f) 0.35f else -0.35f) - spinRate) * min(1f, dt * 0.5f)
+        // tumble: always turning slowly, faster after a knock
+        spinRate += ((if (spinRate >= 0f) 0.22f else -0.22f) - spinRate) * min(1f, dt * 0.4f)
         val curl = cur?.name == "Curl" && curT in 0.5f..2.4f
         spin += spinRate * dt * (if (curl) 4f else 1f)
-        yawPh += dt * (0.25f + speed * 0.05f)
-        // drift: momentum, gentle pull back to the page centre when not flung
-        px += vx * dt / (2f * halfW)
-        vx *= exp(-dt * 0.9f)
-        if (abs(vx) < 0.15f) {
-            val home = Math.round(px - 0.0f).toFloat()
-            px += (home - px) * min(1f, dt * 0.35f)
+        yawPh += dt * (0.22f + speed * 0.04f)
+        // page scrolling moves the world under him: the screen edge comes along and knocks him back in
+        val pp = input.pagePos
+        val dpx = if (lastPage.isNaN()) 0f else (pp - lastPage) * 2f * halfW
+        lastPage = pp; pagePos = pp
+        x -= dpx * 0.85f
+        // free drift: weightless, barely any drag, a faint wander so he never stops
+        vx += sin(time * 0.31f + 1.3f) * 0.02f * dt; vy += cos(time * 0.27f) * 0.02f * dt
+        vx *= exp(-dt * 0.12f); vy *= exp(-dt * 0.12f)
+        val spd = hypot(vx, vy)
+        if (spd < 0.06f) { vx += vx / max(spd, 1e-3f) * 0.02f * dt; vy += vy / max(spd, 1e-3f) * 0.02f * dt }
+        if (spd > 2.5f) { vx *= 2.5f / spd; vy *= 2.5f / spd }
+        x += vx * dt; y += vy * dt
+        // bounce off the screen edges
+        val r = size * 0.42f
+        val lx = -halfW + r; val rx = halfW - r; val by = -halfH + r + bottomInset * 2f * halfH; val ty = halfH - r * 1.1f
+        var bumped = 0f
+        val scroll = (dpx / max(dt, 0.008f)).coerceIn(-6f, 6f)     // how fast the edge is sweeping him
+        if (x < lx) { val push = max(0f, scroll) * 0.35f; bumped = max(bumped, abs(vx) + push); x = lx; vx = abs(vx) * 0.75f + push }
+        if (x > rx) { val push = max(0f, -scroll) * 0.35f; bumped = max(bumped, abs(vx) + push); x = rx; vx = -abs(vx) * 0.75f - push }
+        if (y < by) { bumped = max(bumped, abs(vy)); y = by; vy = abs(vy) * 0.75f }
+        if (y > ty) { bumped = max(bumped, abs(vy)); y = ty; vy = -abs(vy) * 0.75f }
+        if (bumped > 0.25f && time - bumpT > 0.6f) {
+            bumpT = time; spinRate += (if (Random.nextBoolean()) 1f else -1f) * min(3f, bumped * 2f); shake = min(1f, shake + bumped * 0.4f)
+            if (cur?.name != "Poke") play(if (bumped > 0.7f) "Poke" else "Flail")
+            if (bumped > 0.7f) listener?.onDiscovery("cosmo bonk")
         }
-        if (!pagesKnown) { if (px > 1.2f) px -= 1f; if (px < -0.2f) px += 1f }       // single page: wrap round
-        else px = px.coerceIn(-0.4f, 6.4f)
-        vy += (sin(time * 0.37f) * 0.08f - y) * dt * 0.8f; vy *= exp(-dt * 1.2f); y += vy * dt
-        y = y.coerceIn(-halfH + size * 0.6f, halfH - size * 0.6f)
         // what he's doing
         val c = cur
         if (c != null) {
             curT += dt
             val done = !c.loop && curT > c.duration
-            if (c.name == "Flail" && speed < 1.6f && abs(vx) < 0.5f) play("Idle")
+            if (c.name == "Flail" && speed < 1.6f && hypot(vx, vy) < 0.4f) play("Idle")
             else if (done) play("Idle")
         }
         nextLife -= dt
@@ -230,59 +245,59 @@ uniform vec2 uRes; uniform vec2 uHalf; uniform float uFall; uniform float uSpeed
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
-float stars(vec2 p, float dens, float fallOff, float streak, float seed){
-  vec2 q = p * dens; q.y -= fallOff * dens;
-  vec2 id = floor(q); vec2 f = fract(q) - 0.5;
-  float r = h21(id + seed);
-  if (r < 0.86) return 0.0;
-  vec2 o = (vec2(h21(id + seed + 3.1), h21(id + seed + 7.7)) - 0.5) * 0.7;
-  vec2 d = f - o;
-  d.y /= 1.0 + streak;                       // stretched along the fall
-  float s = smoothstep(0.09, 0.0, length(d));
-  return s * (0.4 + 0.6 * h21(id + seed + 1.3));
-}
+float fbm(vec2 p){ float n = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { n += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return n; }
 void main(){
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 p = (uv - 0.5) * uHalf * 2.0;
-  p.x += uPar * 0.25;
-  float sp = uSpeed;
-  // nebula, very slow: soft violet and teal clouds
-  vec2 np = p * 0.9 + vec2(0.0, -uFall * 0.02);
-  float n = 0.0, amp = 0.5; vec2 q = np;
-  for (int i = 0; i < 4; i++) { n += amp * noise(q); q = q * 2.03 + vec2(1.7, 9.2); amp *= 0.5; }
-  float n2 = noise(np * 0.7 + vec2(5.0, 1.0));
-  vec3 col = vec3(0.004, 0.003, 0.012);
-  col += vec3(0.07, 0.025, 0.12) * smoothstep(0.35, 0.85, n) * smoothstep(0.3, 0.8, n2);
-  col += vec3(0.0, 0.04, 0.07) * smoothstep(0.4, 0.9, n) * (1.0 - smoothstep(0.2, 0.7, n2));
-  // a planet sliding past far behind, every ~40 s of fall
-  float cyc = mod(uFall * 0.012, 1.0); float pid = floor(uFall * 0.012);
-  vec2 pc = vec2((h21(vec2(pid, 3.0)) - 0.5) * uHalf.x * 1.4, mix(-uHalf.y - 0.6, uHalf.y + 0.6, cyc));
-  float pr = 0.18 + 0.2 * h21(vec2(pid, 9.0));
-  float pd = length(p - pc); float occ = 1.0;
-  if (pd < pr * 1.4 && h21(vec2(pid, 1.0)) > 0.35) {
-    vec3 pcol = mix(vec3(0.45, 0.3, 0.8), vec3(0.9, 0.55, 0.3), h21(vec2(pid, 5.0)));
-    float lit = clamp(dot(normalize(vec3(p - pc, sqrt(max(0.0, pr * pr - pd * pd)))), normalize(vec3(-0.6, 0.5, 0.6))), 0.0, 1.0);
-    float band = 0.85 + 0.15 * sin((p.y - pc.y) / pr * 12.0 + noise((p - pc) * 8.0) * 3.0);
-    float disk = smoothstep(pr, pr - 0.004, pd);
-    col = mix(col, pcol * (0.12 + 0.9 * lit) * band, disk); occ = 1.0 - disk;
-    col += pcol * 0.25 * smoothstep(pr * 1.4, pr, pd) * (1.0 - disk);   // atmosphere glow
+  // the vanishing point wanders a little: he is drifting, not flying straight
+  vec2 c = vec2(sin(uTime * 0.05), cos(uTime * 0.043)) * 0.12;
+  vec2 q = p - c; float r = length(q); vec2 dir = q / max(r, 1e-4);
+  // nebula: two layers zooming towards us, cross-fading
+  vec3 col = vec3(0.003, 0.002, 0.01);
+  for (int k = 0; k < 2; k++) {
+    float t = fract(uFall * 0.012 + float(k) * 0.5);
+    float sc = mix(2.2, 0.5, t); float a = sin(3.14159 * t);
+    vec2 nq = q * sc + float(k) * 7.3;
+    float n = fbm(nq * 1.3); float m = fbm(nq * 0.7 + 4.0);
+    col += a * (vec3(0.075, 0.025, 0.13) * smoothstep(0.45, 0.85, n) * smoothstep(0.35, 0.8, m)
+              + vec3(0.0, 0.045, 0.08) * smoothstep(0.5, 0.9, n) * (1.0 - smoothstep(0.25, 0.7, m)));
   }
-  // star layers: far ones slow and round, near ones fast and streaky
+  // stars rushing past: six depth layers, each zooming out from the vanishing point, streaking with speed
   float st = 0.0;
-  st += stars(p, 26.0, uFall * 0.05, sp * 0.05, 1.0) * 0.5;
-  st += stars(p, 14.0, uFall * 0.12, sp * 0.25, 7.0) * 0.8;
-  st += stars(p, 7.0, uFall * 0.3, sp * 0.9, 13.0) * 1.1;
-  float tw = 0.8 + 0.2 * sin(uTime * 3.0 + p.x * 40.0);
-  col += vec3(0.85, 0.9, 1.0) * st * tw * occ;
-  // speed lines when falling hard
-  float sl = smoothstep(2.5, 7.0, sp);
-  if (sl > 0.0) {
-    vec2 q = vec2(p.x * 40.0, p.y * 2.0 - uFall * 2.5);
-    vec2 id = floor(q);
-    float line = step(0.93, h21(vec2(id.x, floor(q.y * 0.5)))) * smoothstep(0.5, 0.0, abs(fract(q.x) - 0.5)) * fract(q.y * 0.5);
-    col += vec3(0.6, 0.75, 1.0) * line * sl * 0.35;
+  for (int i = 0; i < 6; i++) {
+    float t = fract(uFall * 0.07 + float(i) / 6.0);
+    float sc = mix(16.0, 1.4, t);
+    vec2 g = q * sc + float(i) * 13.7;
+    vec2 id = floor(g); vec2 f = fract(g) - 0.5;
+    float rnd = h21(id + float(i));
+    if (rnd < 0.82) continue;
+    vec2 o = (vec2(h21(id + 3.1), h21(id + 7.7)) - 0.5) * 0.3;
+    vec2 d = f - o;
+    float rad = dot(d, dir); float tan = dot(d, vec2(-dir.y, dir.x));
+    float streak = min(1.0 + (uSpeed - 0.6) * t * t * 4.0 * min(1.0, r * 2.0), 6.0);
+    float dd = length(vec2(rad / streak, tan));
+    float size = min(0.025 + 0.045 * t, 0.42 / streak);
+    float fade = smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(0.88, 1.0, t));
+    st += smoothstep(size, 0.0, dd) * fade * (0.5 + 0.5 * rnd);
   }
-  col += vec3(0.25, 0.35, 0.6) * uShake * 0.08;
+  col += vec3(0.85, 0.9, 1.0) * st;
+  // a far planet slowly growing as he drifts towards it, every minute or so
+  float cyc = fract(uFall * 0.008); float pid = floor(uFall * 0.008);
+  if (h21(vec2(pid, 1.0)) > 0.3) {
+    vec2 pc = (vec2(h21(vec2(pid, 3.0)), h21(vec2(pid, 4.0))) - 0.5) * uHalf * 1.6 * (0.3 + cyc);
+    float pr = 0.02 + 0.5 * cyc * cyc;
+    float pd = length(q - pc);
+    vec3 pcol = mix(vec3(0.45, 0.3, 0.8), vec3(0.9, 0.55, 0.3), h21(vec2(pid, 5.0)));
+    float a = smoothstep(0.0, 0.1, cyc) * (1.0 - smoothstep(0.85, 1.0, cyc));
+    if (pd < pr) {
+      vec3 nn = normalize(vec3(q - pc, sqrt(max(0.0, pr * pr - pd * pd))));
+      float lit = clamp(dot(nn, normalize(vec3(-0.6, 0.5, 0.6))), 0.0, 1.0);
+      float band = 0.85 + 0.15 * sin((q.y - pc.y) / pr * 12.0 + noise((q - pc) / pr * 4.0) * 3.0);
+      col = mix(col, pcol * (0.08 + 0.9 * lit) * band, smoothstep(pr, pr - 0.004, pd) * a);
+    }
+    col += pcol * 0.18 * smoothstep(pr * 1.35, pr, pd) * step(pr, pd) * a;
+  }
+  col += vec3(0.25, 0.35, 0.6) * uShake * 0.06;
   gl_FragColor = vec4(col, 1.0);
 }
 """

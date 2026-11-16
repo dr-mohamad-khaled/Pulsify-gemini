@@ -9,7 +9,7 @@ BLEND = '/home/claude/cub/cub.props.blend'
 OUT = '/home/claude/cub/baked'
 MOVER = 'mover'; HIPS = 'hips'; HIPS_TARGET = (0.0, 0.15)
 JAW = ('jaw_02', 'X', 28.0)
-SPRINGS = [(['tail2', 'tail3', 'tail4', 'tail_06'], 'tail', 50.0, 5.0)]
+SPRINGS = [(['tail2', 'tail3', 'tail4', 'tail_06'], 'tail', 50.0, 5.0), (['ear.L_01'], 'earL', 170.0, 11.0), (['ear.R_01'], 'earR', 170.0, 11.0)]
 E = None
 STAND = ('cat_sajiao', 1)
 SIT = ('dog_beifumo', 100)
@@ -87,7 +87,11 @@ class Idle(Clip):
     def act(self, t, c):
         breathe(c, t); c.tail(wag=10 * sinp(t, 2.4), up=10 + 6 * sinp(t, 3.6))
         c.head(yaw=18 * env(t, 1.2, 1.5, 2.6, 2.9) - 14 * env(t, 4.0, 4.3, 5.2, 5.5), roll=5 * sinp(t, 7.2))
-        c.ears(back=6 * env(t, 3.2, 3.3, 3.4, 3.6))
+        c.ears(back=6 * env(t, 3.2, 3.3, 3.4, 3.6) - 8 * env(t, 5.6, 5.65, 5.7, 5.85))
+        # never frozen: weight shifting paw to paw, a paw lift, tail tip flicks, sniffing nose bobs
+        sh = sinp(t, 7.2); c.body(roll=3 * sh, yaw=4 * sinp(t, 3.6)); c.turn('hips', 'Y', -2.5 * sh)
+        p = env(t, 2.2, 2.35, 2.55, 2.75); c.front('L', 18 * p, 40 * p)
+        c.tail(wag=14 * env(t, 0.6, 0.7, 0.8, 1.0) * sinp(t, 0.2)); c.head(pitch=4 * env(t % 2.4, 0.0, 0.1, 0.2, 0.3))
 
 
 class LookAround(Clip):
@@ -517,6 +521,21 @@ class FullCharge(Clip):
         ph = ((t - 0.5) / 2.0) % 1.0; h = M['head'].translation
         return {'Heart': T((h.x + 0.3 * math.sin(ph * 6), h.y - 0.15, h.z + 0.35 + 0.45 * ph)) @ Sc(PS * ss(ph / 0.2) * (1 - ss((ph - 0.7) / 0.3)) + 1e-4)}
 
+
+
+def hang(c, t, k=1.0):
+    """Held up by the scruff: the body hangs from the finger, legs and tail straight down, swaying limp."""
+    c.turn('hips', 'X', -62 * k); c.root.z -= 0.12 * k
+    for s, ph in (('L', 0.0), ('R', 0.5)):
+        c.front(s, -62 * k + 7 * sinp(t, 1.6, ph), 6); c.rear(s, -62 * k + 7 * sinp(t, 1.6, ph + 0.3), 4)
+    c.tail(up=-55 * k, wag=6 * sinp(t, 1.6)); c.head(pitch=44 * k, roll=5 * sinp(t, 3.2))
+
+
+class Dangle(Clip):
+    """Lifted by the finger: hangs limp under gravity, paws dangling, a resigned little sway."""
+    loop = True; group = 'touch'
+    def __init__(self): super().__init__('Dangle', 3.2, loop=True)
+    def act(self, t, c): hang(c, t)
 
 def library():
     return [Idle(), LookAround(), HeadTilt(), Yawn(), Sneeze(), Stretch(), Groom(), Sit(), SitDown(), StandUp(), LieDown(), RollOver(),

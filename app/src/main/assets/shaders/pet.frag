@@ -147,7 +147,7 @@ void main() {
     float fill = clamp(dot(N, normalize(vec3(-0.7, 0.2, 0.6))) * 0.5 + 0.5, 0.0, 1.0);
     float sky = N.y * 0.5 + 0.5;
     vec3 light = vec3(1.0, 0.97, 0.92) * wrap * 0.78 + vec3(0.75, 0.82, 1.0) * fill * 0.22 + vec3(0.22, 0.22, 0.26) * sky;
-    float rim = pow(1.0 - clamp(dot(N, normalize(V)), 0.0, 1.0), 3.0);
+    float rim = smoothstep(0.55, 1.0, 1.0 - clamp(dot(N, normalize(V)), 0.0, 1.0)) * 0.7;
     vec3 H = normalize(L + normalize(V));
     float spec = pow(clamp(dot(N, H), 0.0, 1.0), mix(8.0, 90.0, gloss)) * mix(0.04, 0.9, gloss * gloss);
     vec3 col = base * light + vec3(1.0, 0.93, 0.85) * rim * 0.28 + vec3(spec);

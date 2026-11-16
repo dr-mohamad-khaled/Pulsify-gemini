@@ -48,6 +48,8 @@ def bake(c):
             if C.JAW: ctx.turn(C.JAW[0], C.JAW[1], C.JAW[2] * jaw)
             if ctx.turns:
                 M = E.fk(P); E.turn(P, M, ctx.turns)
+            for b, sc in getattr(ctx, 'scales', []):
+                P[b][2] = Vector((P[b][2][0] * sc[0], P[b][2][1] * sc[1], P[b][2][2] * sc[2]))
             if c.springs:
                 for chain, key, k, d in C.SPRINGS: E.spring_step(P, chain, key, k=k, damp=d)
             M = E.fk(P)

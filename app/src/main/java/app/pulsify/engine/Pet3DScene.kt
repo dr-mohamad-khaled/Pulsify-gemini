@@ -4,6 +4,7 @@ import android.content.Context
 import app.pulsify.core.AudioFrame
 import app.pulsify.core.Mood
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.max
@@ -33,6 +34,7 @@ class PetSpecies(
     val alias: Map<String, String> = emptyMap(),   // scene clip name -> this pet's clip (birds fly instead of jump)
     val big: Float = 1f,                   // on-screen size factor
     val angryPokes: Int = 7,               // pokes within 8 s that trigger [angry]
+    val glide: Boolean = false,            // birds flutter down slowly instead of dropping
 )
 
 val PET_KITTEN = PetSpecies(
@@ -98,7 +100,7 @@ private val BIRD_ALIAS = mapOf("JumpStart" to "TakeOff", "JumpAir" to "Fly", "Ju
 private fun bird(model: String) = PetSpecies(
     model, "Walk", 0.45f, BIRD_LIFE, "Chirp", "Plugged", "DanceBob", "Fluff", BIRD_TRICKS,
     dances = listOf("DanceBob", "DanceWings", "DanceSide", "DanceSpin", "DanceHeadbang"), run = "Run", runSpeed = 1.2f,
-    ownFace = true, angry = "Angry", alias = BIRD_ALIAS, big = 0.85f,
+    ownFace = true, angry = "Angry", alias = BIRD_ALIAS, big = 0.92f, glide = true,
 )
 /** Leo the lion cub: a tiny lion who is SURE he is the king. Roars come out as squeaks; he loves belly rubs. */
 val PET_LION = PetSpecies(
@@ -133,7 +135,7 @@ val PET_NUTMEG = PetSpecies(
     mapOf("nibble" to "Nibble", "stash" to "Stash", "lookout" to "Lookout", "flick" to "TailFlick", "zoom" to "Zoomies",
         "catch" to "Catch", "spin" to "Spin", "scratch" to "Scratch", "feed" to "Catch", "drum" to "Drum"),
     dances = listOf("DanceTail", "DanceDrum", "DanceHop"), run = "Run", runSpeed = 1.5f, ownFace = true, angry = "Knockdown",
-    angryPokes = 5, big = 0.85f,
+    angryPokes = 5, big = 0.9f,
 )
 val PET_BUDGIE = bird("budgie")
 val PET_COCKATIEL = bird("cockatiel")
@@ -189,6 +191,7 @@ class Pet3DScene(private val context: Context) : Creature {
 
     // touch
     private var touching = false; private var downAt = 0f; private var downOnPet = false
+    private var swing = 0f; private var swingV = 0f; private var carryVx = 0f; private var fallTop = 0f
     private var tX = 0f; private var tY = 0f; private var t0X = 0f; private var t0Y = 0f
     private var path = 0f; private var lastMX = 0f; private var lastMY = 0f
     private var held = false
@@ -216,7 +219,7 @@ class Pet3DScene(private val context: Context) : Creature {
     }
     private fun layout() {
         laidOut = true
-        size = min(0.42f, halfW * 0.8f) * species.big
+        size = min(0.6f * halfH, halfW * 1.2f) * species.big      // about 30 % of the screen
         floorY = if (ground.isNaN()) -halfH + 0.3f else ground
         if (h.toFloat() / w < 1.5f) { size = min(0.32f, halfW * 0.55f); floorY = -halfH + 0.12f }
         if (bottomInset > 0f) {
@@ -311,7 +314,7 @@ class Pet3DScene(private val context: Context) : Creature {
         if (!touching) return false
         touching = false; sinceTouch = 0f
         val tap = path < size * 0.08f && time - downAt < 0.35f
-        if (mode == Mode.CARRY) { mode = Mode.AIR; vx = 0f; vy = 0f; landOnLedge = -2; play("JumpAir") }
+        if (mode == Mode.CARRY) { mode = Mode.AIR; vx = carryVx * 0.4f; vy = 0f; landOnLedge = -2; fallTop = y; play("JumpAir") }
         else if (tap) { if (downOnPet) poke() else goTo(tX, tY) }
         return true
     }
@@ -523,8 +526,14 @@ class Pet3DScene(private val context: Context) : Creature {
             Mode.CARRY -> {
                 if (!touching) { mode = Mode.AIR; vx = 0f; vy = 0f; landOnLedge = -2; return }
                 val tx = tX; val ty = tY - size * 1.05f
+                val ox = x
                 x += (tx - x) * min(1f, dt * 14f); y += (ty - y) * min(1f, dt * 14f)
                 facing = 0f
+                // hanging from the finger: a pendulum driven by how hard the finger accelerates
+                val nvx = (x - ox) / max(dt, 0.008f); val ax = (nvx - carryVx) / max(dt, 0.008f); carryVx = nvx
+                swingV += (-28f * sin(swing) - 3.2f * swingV - ax / size * 0.09f) * dt
+                swing = (swing + swingV * dt).coerceIn(-1.1f, 1.1f)
+                fallTop = y
             }
             Mode.SLEEP -> {
                 if (clipDone() && curName == "FallAsleep") play("Sleep")
@@ -548,7 +557,9 @@ class Pet3DScene(private val context: Context) : Creature {
             return
         }
         if (!grounded) {
-            vy -= GRAV * size * dt
+            vy -= GRAV * size * dt * (if (species.glide) 0.3f else 1f)
+            if (species.glide) vy = max(vy, -size * 1.6f)
+            fallTop = max(fallTop, y)
             x += vx * dt; y += vy * dt
             if (vy < 0f) for (L in ledges) {
                 if (x > L.l + size * 0.1f && x < L.r - size * 0.1f && y <= L.t && y - vy * dt >= L.t - 0.002f && visible(L)
@@ -566,8 +577,14 @@ class Pet3DScene(private val context: Context) : Creature {
     }
     private fun land() {
         grounded = true; vy = 0f; vx *= 0.2f; landOnLedge = -1
-        play("JumpLand"); facing = 0f
-        burst(9f, 3, x, y + size * 0.04f, 1f, 1f, 1f, 0.02f)
+        val drop = (fallTop - y) / size; fallTop = y
+        facing = 0f
+        // the higher the fall, the harder the landing: a soft hop, a thud, or a full tumble
+        if (drop > 1.6f && !species.glide && pet.clips.containsKey(species.alias["Tumble"] ?: "Tumble")) {
+            play("Tumble"); discover("big fall"); burst(9f, 8, x, y + size * 0.04f, 1f, 1f, 1f, 0.035f)
+        } else {
+            play("JumpLand"); burst(9f, if (drop > 0.6f) 5 else 3, x, y + size * 0.04f, 1f, 1f, 1f, if (drop > 0.6f) 0.03f else 0.02f)
+        }
     }
 
     private fun advance(dt: Float) {
@@ -644,7 +661,14 @@ class Pet3DScene(private val context: Context) : Creature {
         val air = if (onLedge >= 0) 0f else ((y - floorY) / size).coerceIn(0f, 2f)
         if (onLedge < 0) pet.quad(1f, x, floorY + 0.004f, size * 0.45f * (1f - air * 0.3f), size * 0.075f, 0f, 0f, 0f, 0f, 1f - min(0.8f, air * 0.6f))
         else ledgeById(onLedge)?.let { pet.quad(1f, x, it.t + 0.004f, size * 0.4f, size * 0.065f, 0f, 0f, 0f, 0f, 0.8f) }
-        pet.sprite(x, y + pet.boxCz * k, boxHalf, 0f, 1f)
+        if (mode != Mode.CARRY) { swing *= 0.85f; swingV = 0f }
+        val cy = y + pet.boxCz * k
+        if (abs(swing) > 0.002f) {
+            // rotate the hanging body around the finger
+            val px = tX; val py = tY; val dx = x - px; val dy = cy - py
+            val cs = cos(swing); val sn = sin(swing)
+            pet.sprite(px + dx * cs - dy * sn, py + dx * sn + dy * cs, boxHalf, swing, 1f)
+        } else pet.sprite(x, cy, boxHalf, 0f, 1f)
         for (p in parts) {
             val a = (min(1f, p.life * 6f) * min(1f, (p.max - p.life) * 2.5f)).coerceIn(0f, 1f)
             val s = p.s * (0.6f + 0.4f * min(1f, p.life * 4f))

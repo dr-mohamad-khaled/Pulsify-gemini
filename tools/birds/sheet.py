@@ -9,7 +9,7 @@ rig = bpy.data.objects['Rig']; names = [b.name for b in rig.data.bones]
 import json; bj = json.load(open(f'/home/claude/birds/{key}/baked/_bones.json')); order = bj['names']
 for pb in rig.pose.bones: pb.rotation_mode = 'QUATERNION'
 sc = bpy.context.scene; sc.render.engine = 'BLENDER_WORKBENCH'; sc.display.shading.light = 'STUDIO'; sc.display.shading.color_type = 'TEXTURE'
-S = 260; sc.render.resolution_x = sc.render.resolution_y = S; sc.render.film_transparent = True
+S = int(os.environ.get("S", 260)); sc.render.resolution_x = sc.render.resolution_y = S; sc.render.film_transparent = True
 cam = bpy.data.objects.new('c', bpy.data.cameras.new('c')); sc.collection.objects.link(cam); sc.camera = cam; cam.data.type = 'ORTHO'; cam.data.ortho_scale = 3.0
 d = Vector((1, -0.25, 0.15) if os.environ.get('VIEW') == 'side' else (0.55, -1, 0.3)).normalized(); cam.location = Vector((0, 0, 0.9)) + d * 10; cam.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
 from PIL import Image, ImageDraw

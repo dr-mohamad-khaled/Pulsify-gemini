@@ -563,6 +563,23 @@ class FullCharge(Clip):
         c.tail(wag=25 * sinp(t, 0.25), up=20)
 
 
+
+def hang(c, t, k=1.0):
+    """Held up by the scruff: the body hangs from the finger, legs and tail straight down, swaying limp."""
+    c.turn('hips', 'X', -62 * k); c.root.z -= 0.12 * k
+    for s, ph in (('L', 0.0), ('R', 0.5)):
+        c.front(s, -62 * k + 7 * sinp(t, 1.6, ph), 6); c.rear(s, -62 * k + 7 * sinp(t, 1.6, ph + 0.3), 4)
+    c.tail(up=-55 * k, wag=6 * sinp(t, 1.6)); c.head(pitch=44 * k, roll=5 * sinp(t, 3.2)); c.ears(back=12)
+
+
+class Dangle(Clip):
+    """Lifted by the finger: hangs limp under gravity, paws dangling, a resigned little sway."""
+    loop = True; group = 'touch'
+    def __init__(self):
+        super().__init__('Dangle', 3.2, loop=True, seed=26)
+        F = self.face; F['pupil'].d = 1.15; F['tilt'].d = 0.45
+    def act(self, t, c): hang(c, t)
+
 def library():
     return [Idle(), Sniff(), Walk(), Run(), Wag(), SitDown(), Sit(), StandUp(), LieDown(), FallAsleep(), Sleep(), WakeUp(),
             Bark(), Howl(), HeadTilt(), PlayBow(), Shake(), ChaseTail(), Dig(), Fetch(), Eat(), Chew(), Butterfly(),
