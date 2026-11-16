@@ -11,8 +11,8 @@ import kotlin.math.atan
 import kotlin.math.max
 import kotlin.math.min
 
-/** One baked animation of a PET1 model: skin matrices (3x4 per bone) and eye/face controls per frame. */
-class PetClip(val name: String, val frames: Int, val loop: Boolean, val mats: FloatArray, val ctl: FloatArray, val fps: Float) {
+/** One baked animation of a PET1/PET2 model: skin matrices (3x4 per bone) and eye/face controls per frame. */
+class PetClip(val name: String, val frames: Int, val loop: Boolean, val mats: FloatArray, val ctl: FloatArray, val fps: Float, val nctl: Int = 8) {
     val duration: Float get() = (frames - 1) / fps
 }
 
@@ -44,8 +44,11 @@ class Pet3D(private val context: Context) {
     val boxCz = 0.62f
 
     // current pose
-    val pose = FloatArray(32 * 12)
+    val pose = FloatArray(MAX_BONES * 12)
     val eyeL = FloatArray(4); val eyeR = FloatArray(4)
+    /** happy (^^), pupil scale — PET2 eyes only. */
+    val mood = floatArrayOf(0f, 1f)
+    var nCtl = 8; private set
     var face = 0f; var facePhase = 0f
     var yaw = 0f; var lean = 0f
     var dim = 0f; var glow = 0f
@@ -56,7 +59,7 @@ class Pet3D(private val context: Context) {
     fun create() {
         prog = Gl.program(asset("shaders/pet.vert"), asset("shaders/pet.frag"))
         uni["uB"] = GLES20.glGetUniformLocation(prog, "uB[0]").let { if (it >= 0) it else GLES20.glGetUniformLocation(prog, "uB") }
-        for (n in listOf("uVP", "uModel", "uTex", "uEyes", "uEyeMode", "uEyeL", "uEyeR", "uFace", "uFur", "uLash",
+        for (n in listOf("uVP", "uModel", "uTex", "uEyes", "uEyeMode", "uEyeL", "uEyeR", "uMood", "uFace", "uFur", "uLash",
             "uLightDir", "uDim", "uGlow", "uScreenHalf")) uni[n] = GLES20.glGetUniformLocation(prog, n)
         for (n in listOf("aNrm", "aUv", "aEye", "aBone", "aWeight", "aCol", "aEye2")) uni[n] = GLES20.glGetAttribLocation(prog, n)
         fxProg = Gl.program(asset("shaders/kitfx.vert"), asset("shaders/kitfx.frag"))
@@ -81,9 +84,13 @@ class Pet3D(private val context: Context) {
         freeModel()
         val bytes = context.assets.open("pets/$name.pet").use { it.readBytes() }
         val bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        require(bb.get().toInt() == 'P'.code && bb.get().toInt() == 'E'.code && bb.get().toInt() == 'T'.code && bb.get().toInt() == '1'.code) { "not a PET1 model" }
+        require(bb.get().toInt() == 'P'.code && bb.get().toInt() == 'E'.code && bb.get().toInt() == 'T'.code) { "not a PET model" }
+        val ver = bb.get().toInt() - '0'.code
+        require(ver == 1 || ver == 2) { "unknown PET version $ver" }
         val nv = bb.int; val ni = bb.int; nBones = bb.int; val nc = bb.int
+        require(nBones <= MAX_BONES) { "too many bones: $nBones" }
         height = bb.float; val fps = bb.float; eyeMode = bb.int
+        nCtl = if (ver >= 2) bb.int else 8
         for (i in 0 until 3) fur[i] = bb.float
         for (i in 0 until 3) lash[i] = bb.float
         val vOff = bb.position()
@@ -106,15 +113,15 @@ class Pet3D(private val context: Context) {
             val frames = bb.short.toInt() and 0xFFFF; val loop = bb.get().toInt() != 0
             val mats = FloatArray(frames * nBones * 12)
             for (i in mats.indices) mats[i] = half(bb.short)
-            val ctl = FloatArray(frames * 8)
+            val ctl = FloatArray(frames * nCtl)
             for (i in ctl.indices) ctl[i] = half(bb.short)
-            clips[nm] = PetClip(nm, frames, loop, mats, ctl, fps)
+            clips[nm] = PetClip(nm, frames, loop, mats, ctl, fps, nCtl)
         }
         tex = texture("pets/$name.jpg")
         eyeTex = if (eyeMode == 1) texture("pets/${name}_eyes.png") else 0
         loaded = name
         // rest pose until the scene poses it
-        for (b in 0 until 32) { val o = b * 12; java.util.Arrays.fill(pose, o, o + 12, 0f); pose[o] = 1f; pose[o + 5] = 1f; pose[o + 10] = 1f }
+        for (b in 0 until MAX_BONES) { val o = b * 12; java.util.Arrays.fill(pose, o, o + 12, 0f); pose[o] = 1f; pose[o + 5] = 1f; pose[o + 10] = 1f }
     }
 
     private fun texture(path: String): Int {
@@ -131,14 +138,16 @@ class Pet3D(private val context: Context) {
         return t[0]
     }
 
-    /** Writes [clip] at time [t] (seconds) into [out]/[ctl] (8 controls). */
+    /** Writes [clip] at time [t] (seconds) into [out]/[ctl] (up to MAX_CTL controls; missing ones are 0). */
     fun sample(clip: PetClip, t: Float, out: FloatArray, ctl: FloatArray) {
         val f = (t * clip.fps).coerceIn(0f, (clip.frames - 1).toFloat())
         val f0 = f.toInt().coerceAtMost(clip.frames - 1); val f1 = min(f0 + 1, clip.frames - 1); val a = f - f0
         val n = nBones * 12
         val o0 = f0 * n; val o1 = f1 * n
         for (i in 0 until n) out[i] = clip.mats[o0 + i] + (clip.mats[o1 + i] - clip.mats[o0 + i]) * a
-        for (i in 0 until 8) ctl[i] = clip.ctl[f0 * 8 + i] + (clip.ctl[f1 * 8 + i] - clip.ctl[f0 * 8 + i]) * a
+        val k = clip.nctl
+        for (i in 0 until min(k, ctl.size)) ctl[i] = clip.ctl[f0 * k + i] + (clip.ctl[f1 * k + i] - clip.ctl[f0 * k + i]) * a
+        for (i in k until ctl.size) ctl[i] = 0f
     }
 
     fun ensureSprite(px: Int) {
@@ -199,6 +208,7 @@ class Pet3D(private val context: Context) {
         GLES20.glUniform4fv(uni["uB"]!!, nBones * 3, pose, 0)
         GLES20.glUniform1f(uni["uEyeMode"]!!, eyeMode.toFloat())
         GLES20.glUniform4fv(uni["uEyeL"]!!, 1, eyeL, 0); GLES20.glUniform4fv(uni["uEyeR"]!!, 1, eyeR, 0)
+        GLES20.glUniform2f(uni["uMood"]!!, mood[0], mood[1])
         GLES20.glUniform2f(uni["uFace"]!!, face, facePhase)
         GLES20.glUniform3fv(uni["uFur"]!!, 1, fur, 0); GLES20.glUniform3fv(uni["uLash"]!!, 1, lash, 0)
         GLES20.glUniform3f(uni["uLightDir"]!!, 0.45f, 0.65f, 0.62f)
@@ -283,6 +293,8 @@ class Pet3D(private val context: Context) {
     }
 
     companion object {
+        const val MAX_BONES = 40
+        const val MAX_CTL = 12
         private val HALF: FloatArray by lazy { FloatArray(65536) { halfSlow(it.toShort()) } }
         fun half(s: Short): Float = HALF[s.toInt() and 0xFFFF]
         /** IEEE half -> float. */

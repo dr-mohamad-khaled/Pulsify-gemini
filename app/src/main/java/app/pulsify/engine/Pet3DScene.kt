@@ -24,6 +24,12 @@ class PetSpecies(
     val dance: String,
     val tapThrice: String,
     val tricks: Map<String, String>,       // Studio trick id -> clip
+    val dances: List<String> = emptyList(), // music: a random one of these (else [dance])
+    val walks: List<String> = emptyList(),  // walk variants (else [walk]); "CarryBread" ends in a peck
+    val run: String? = null,               // long trips
+    val runSpeed: Float = 1f,
+    val ownFace: Boolean = false,          // clips carry their own blinks, glances and moods (PET2)
+    val angry: String? = null,             // too many pokes in a row
 )
 
 val PET_KITTEN = PetSpecies(
@@ -44,14 +50,18 @@ val PET_PUPPY = PetSpecies(
     mapOf("fetch" to "PlayBall", "paw" to "PawLift", "belly" to "Pet", "dig" to "Sniff", "howl" to "HeadTilt", "butterfly" to "ChaseButterfly",
         "zoomies" to "Spin", "yawn" to "Stretch"),
 )
+/** Snowy v2: Meshy auto-rig + Meshy motions + hand-made acting (face moods, beak, props). */
 val PET_DUCK = PetSpecies(
-    "duck", "Waddle", 0.35f,
-    listOf("LookAround" to 2.5f, "HeadTilt" to 2f, "Quack" to 2.5f, "WingFlap" to 2f, "TryToFly" to 1.4f, "Preen" to 1.8f,
-        "PeckCrumbs" to 1.6f, "Splash" to 1.4f, "RubberDuck" to 1.4f, "ChaseButterfly" to 1.2f, "Shake" to 1f, "Sneeze" to 0.6f,
-        "Stretch" to 0.8f, "Happy" to 1f, "Spin" to 0.5f),
-    "Quack", "WingFlap", "Happy", "TryToFly",
-    mapOf("quack" to "Quack", "flap" to "WingFlap", "fly" to "TryToFly", "preen" to "Preen", "crumbs" to "PeckCrumbs",
-        "splash" to "Splash", "toy" to "RubberDuck", "butterfly" to "ChaseButterfly", "sleep" to "Sleep"),
+    "snowy", "Walk", 0.45f,
+    listOf("Quack" to 2.5f, "HeadTilt" to 2f, "LookAround" to 2f, "Notice" to 1.5f, "TryToFly" to 1.4f, "Preen" to 1.4f,
+        "Peck" to 1.4f, "Splash" to 1.3f, "RubberDuck" to 1.3f, "ChaseButterfly" to 1.2f, "Shake" to 1f, "Spin" to 0.7f),
+    "Quack", "Spin", "DancePop", "Tumble",
+    mapOf("quack" to "Quack", "flap" to "TryToFly", "fly" to "TryToFly", "preen" to "Preen", "crumbs" to "Peck",
+        "splash" to "Splash", "toy" to "RubberDuck", "butterfly" to "ChaseButterfly", "sleep" to "Sleep", "dance" to "DanceHipHop",
+        "spin" to "Spin", "shake" to "Shake", "kick" to "AngryKick", "tumble" to "Tumble"),
+    dances = listOf("DancePop", "DanceHipHop", "DanceHipHop2", "DanceBubble", "DanceCardio", "DanceJoy", "DanceNight"),
+    walks = listOf("Walk", "Walk", "Walk", "CarryBread"),
+    run = "Run", runSpeed = 1.15f, ownFace = true, angry = "AngryKick",
 )
 val PET_BOT = PetSpecies(
     "bot", "Hop", 0.5f,
@@ -96,8 +106,10 @@ class Pet3DScene(private val context: Context) : Creature {
     // clip player
     private var cur: PetClip? = null; private var curT = 0f
     private var fadeFrom: PetClip? = null; private var fadeFromT = 0f; private var fade = 1f
-    private val matA = FloatArray(32 * 12); private val matB = FloatArray(32 * 12)
-    private val ctlA = FloatArray(8); private val ctlB = FloatArray(8)
+    private val matA = FloatArray(Pet3D.MAX_BONES * 12); private val matB = FloatArray(Pet3D.MAX_BONES * 12)
+    private val ctlA = FloatArray(Pet3D.MAX_CTL); private val ctlB = FloatArray(Pet3D.MAX_CTL)
+    private var walkClip = ""; private var walkSpd = 0.4f
+    private val pokeTimes = ArrayList<Float>()
     private var nextLife = 4f
     private var lastLife = ""
     private var sleepLeft = 0f
@@ -257,6 +269,9 @@ class Pet3DScene(private val context: Context) : Creature {
         if (mode == Mode.SLEEP) { wake(); return }
         if (time - lastTap < 0.6f) taps++ else taps = 1
         lastTap = time
+        pokeTimes += time; pokeTimes.removeAll { time - it > 8f }
+        val mad = species.angry
+        if (mad != null && pokeTimes.size >= 7) { pokeTimes.clear(); taps = 0; play(mad); discover("grumpy"); return }
         if (taps >= 3) { taps = 0; play(species.tapThrice); discover("triple tap"); return }
         play("Poke"); burst(9f, 3, x, headY, 1f, 0.95f, 0.6f, 0.025f)
     }
@@ -279,8 +294,19 @@ class Pet3DScene(private val context: Context) : Creature {
         if (L != null) { jumpTo(ux.coerceIn(L.l + size * 0.3f, L.r - size * 0.3f), L.t, L.id); return }
         if (onLedge >= 0) { jumpTo(ux.coerceIn(-halfW + size * 0.45f, halfW - size * 0.45f), floorY, -1); return }
         targetX = ux.coerceIn(-halfW + size * 0.45f, halfW - size * 0.45f)
-        if (abs(targetX - x) > size * 0.15f) { mode = Mode.WALK; afterWalk = if (Random.nextBoolean()) "HeadTilt" else "LookAround"; play(species.walk, false) }
+        if (abs(targetX - x) > size * 0.15f) startWalk(if (Random.nextBoolean()) "HeadTilt" else "LookAround")
         else play("HeadTilt")
+    }
+
+    private fun startWalk(after: String?) {
+        mode = Mode.WALK
+        val far = abs(targetX - x) > halfW * 0.9f
+        val run = species.run
+        val pick = if (far && run != null) run else species.walks.randomOrNull() ?: species.walk
+        walkClip = pick
+        walkSpd = if (pick == run) species.walkSpeed * species.runSpeed * 2f else species.walkSpeed
+        afterWalk = if (pick == "CarryBread") "Peck" else after
+        play(pick, false)
     }
 
     private fun hopInPlace() { if (!busyActing()) jumpTo(x, y, onLedge, apex = size * 0.5f) }
@@ -361,7 +387,7 @@ class Pet3DScene(private val context: Context) : Creature {
                 if (held && touching) { if (clipDone()) play("Pet"); return }
                 if (clipDone()) { held = false; play("Idle", false) }
                 if (curName != "Idle") return
-                if (musicOn && input.audio.beat > 0.8f && time - lastBeat > 2.5f) { lastBeat = time; play(species.dance); return }
+                if (musicOn && input.audio.beat > 0.8f && time - lastBeat > 2.5f) { lastBeat = time; play(species.dances.randomOrNull() ?: species.dance); return }
                 nextLife -= dt
                 if (nextLife > 0f) return
                 nextLife = TRICK_GAP_MIN + Random.nextFloat() * TRICK_GAP_RANGE
@@ -381,7 +407,7 @@ class Pet3DScene(private val context: Context) : Creature {
                     }
                     mode == Mode.FLOOR && roll < 0.48f -> {
                         targetX = (Random.nextFloat() - 0.5f) * 2f * (halfW - size * 0.5f)
-                        if (abs(targetX - x) > size * 0.3f) { mode = Mode.WALK; afterWalk = null; play(species.walk, false) } else pickLife(input)
+                        if (abs(targetX - x) > size * 0.3f) startWalk(null) else pickLife(input)
                     }
                     else -> pickLife(input)
                 }
@@ -394,8 +420,8 @@ class Pet3DScene(private val context: Context) : Creature {
                     val n = afterWalk; afterWalk = null
                     if (n != null) play(n) else play("Idle")
                 } else {
-                    x += sign(d) * min(abs(d), species.walkSpeed * size * dt)
-                    if (curName != species.walk) play(species.walk, false)
+                    x += sign(d) * min(abs(d), walkSpd * size * dt)
+                    if (curName != walkClip) play(walkClip.ifEmpty { species.walk }, false)
                 }
             }
             Mode.LAUNCH -> if (curT > 0.36f || clipDone()) launch()
@@ -463,7 +489,7 @@ class Pet3DScene(private val context: Context) : Creature {
             pet.sample(ff, if (ff.loop) fadeFromT % max(0.01f, ff.duration) else min(fadeFromT, ff.duration), matB, ctlB)
             val a = fade * fade * (3f - 2f * fade)
             for (i in 0 until nb) pet.pose[i] = matB[i] + (matA[i] - matB[i]) * a
-            for (i in 0 until 8) ctlA[i] = ctlB[i] + (ctlA[i] - ctlB[i]) * a
+            for (i in ctlA.indices) ctlA[i] = ctlB[i] + (ctlA[i] - ctlB[i]) * a
             if (a > 0.5f) { pet.face = ctlA[6] } else pet.face = ctlB[6]
         } else {
             System.arraycopy(matA, 0, pet.pose, 0, nb); pet.face = ctlA[6]
@@ -476,6 +502,19 @@ class Pet3DScene(private val context: Context) : Creature {
     }
 
     private fun eyes(dt: Float) {
+        if (species.ownFace) {
+            // the clip already blinks, glances and emotes; we only add where the finger is
+            if (!touching && sinceTouch > 1.5f) { lookTX = 0f; lookTY = 0f }
+            lookX += (lookTX - lookX) * min(1f, dt * 8f); lookY += (lookTY - lookY) * min(1f, dt * 8f)
+            val lx = if (touching || sinceTouch < 1.5f) lookX else 0f; val ly = if (touching || sinceTouch < 1.5f) lookY else 0f
+            pet.eyeL[0] = ctlA[0]; pet.eyeR[0] = ctlA[1]
+            pet.eyeL[1] = (ctlA[2] + lx).coerceIn(-0.5f, 0.5f); pet.eyeL[2] = (ctlA[3] + ly).coerceIn(-0.4f, 0.4f)
+            pet.eyeR[1] = (ctlA[4] + lx).coerceIn(-0.5f, 0.5f); pet.eyeR[2] = (ctlA[5] + ly).coerceIn(-0.4f, 0.4f)
+            pet.eyeL[3] = ctlA[8]; pet.eyeR[3] = ctlA[8]
+            pet.mood[0] = ctlA[9]; pet.mood[1] = if (ctlA[10] > 0.05f) ctlA[10] else 1f
+            return
+        }
+        pet.eyeL[3] = 0f; pet.eyeR[3] = 0f; pet.mood[0] = 0f; pet.mood[1] = 1f
         nextBlink -= dt
         if (nextBlink <= 0f) { blink = 1f; nextBlink = 2.2f + Random.nextFloat() * 3.5f; if (Random.nextFloat() < 0.2f) nextBlink = 0.2f }
         blink = max(0f, blink - dt * 7f)

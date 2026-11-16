@@ -1,4 +1,4 @@
-// Pulsify 3D pets (Meshy models): GPU skinning, up to 32 bones as 3x4 matrices. GLSL ES 1.00.
+// Pulsify 3D pets (Meshy models): GPU skinning, up to 40 bones as 3x4 matrices. GLSL ES 1.00.
 attribute vec3 aPos;
 attribute vec4 aNrm;           // normal (signed, normalised) + gloss
 attribute vec2 aUv;
@@ -10,7 +10,7 @@ attribute vec2 aEye2;          // right eye (robot: back screen), same scale
 
 uniform mat4 uVP;              // view-projection (GL space)
 uniform mat4 uModel;           // Blender z-up -> GL y-up, facing turn
-uniform vec4 uB[96];           // 32 bones x 3 rows
+uniform vec4 uB[120];          // 40 bones x 3 rows
 
 varying vec3 vN;
 varying vec3 vP;

@@ -4,9 +4,10 @@ from PIL import Image, ImageDraw
 
 def load(path):
     b = open(path, 'rb').read()
-    assert b[:4] == b'PET1'
+    assert b[:4] in (b'PET1', b'PET2')
     nv, ni, nb, nc, height, fps, eye_mode = struct.unpack_from('<IIIIffI', b, 4)
-    o = 4 + 28 + 24
+    nctl = struct.unpack_from('<I', b, 32)[0] if b[:4] == b'PET2' else 8
+    o = 4 + 28 + (4 if b[:4] == b'PET2' else 0) + 24
     V = np.frombuffer(b, np.uint8, nv * 40, o).reshape(nv, 40); o += nv * 40
     pos = V[:, 0:12].copy().view(np.float32).reshape(nv, 3)
     bones = V[:, 24:28].astype(int); w = V[:, 28:32].astype(np.float32) / 255
@@ -17,7 +18,7 @@ def load(path):
         L = b[o]; o += 1; name = b[o:o + L].decode(); o += L
         fr, loop = struct.unpack_from('<HB', b, o); o += 3
         m = np.frombuffer(b, np.float16, fr * nb * 12, o).astype(np.float32).reshape(fr, nb, 3, 4); o += fr * nb * 12 * 2
-        c = np.frombuffer(b, np.float16, fr * 8, o).astype(np.float32).reshape(fr, 8); o += fr * 8 * 2
+        c = np.frombuffer(b, np.float16, fr * nctl, o).astype(np.float32).reshape(fr, nctl); o += fr * nctl * 2
         clips[name] = (m, c, loop)
     return dict(pos=pos, bones=bones, w=w, col=col, eid=eid, clips=clips, nb=nb, height=height, eye=eye_mode)
 

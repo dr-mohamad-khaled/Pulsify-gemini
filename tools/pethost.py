@@ -45,8 +45,9 @@ A = lambda n: gl.glGetAttribLocation(prog, n)
 
 raw = open(os.path.join(assets, f'pets/{model}.pet'), 'rb').read()
 nv, ni, nb, nc, height, fps, eye_mode = struct.unpack_from('<IIIIffI', raw, 4)
-fur = struct.unpack_from('<3f', raw, 32); lash = struct.unpack_from('<3f', raw, 44)
-vo = 56
+ex = 4 if raw[:4] == b'PET2' else 0
+fur = struct.unpack_from('<3f', raw, 32 + ex); lash = struct.unpack_from('<3f', raw, 44 + ex)
+vo = 56 + ex
 vbo = gl.glGenBuffers(1); gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo)
 gl.glBufferData(gl.GL_ARRAY_BUFFER, nv * 40, raw[vo:vo + nv * 40], gl.GL_STATIC_DRAW)
 ibo = gl.glGenBuffers(1); gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, ibo)
@@ -103,7 +104,9 @@ for r, nm in enumerate(names):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glUniformMatrix4fv(U('uModel'), 1, True, model_m(0.35))
         gl.glUniform4fv(ub, nb * 3, m[f].reshape(-1).astype(np.float32))
-        gl.glUniform4f(U('uEyeL'), c[f][0], c[f][2], c[f][3], 0); gl.glUniform4f(U('uEyeR'), c[f][1], c[f][4], c[f][5], 0)
+        tilt = c[f][8] if len(c[f]) > 8 else 0.0
+        gl.glUniform4f(U('uEyeL'), c[f][0], c[f][2], c[f][3], tilt); gl.glUniform4f(U('uEyeR'), c[f][1], c[f][4], c[f][5], tilt)
+        gl.glUniform2f(U('uMood'), c[f][9] if len(c[f]) > 9 else 0.0, c[f][10] if len(c[f]) > 10 and c[f][10] > 0.05 else 1.0)
         gl.glUniform2f(U('uFace'), c[f][6], c[f][7])
         gl.glDrawElements(gl.GL_TRIANGLES, ni, gl.GL_UNSIGNED_SHORT, None)
         buf = (ctypes.c_ubyte * (S * S * 4))()

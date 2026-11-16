@@ -4,9 +4,10 @@ precision mediump float;
 uniform sampler2D uTex;
 uniform sampler2D uEyes;       // L | R eye crops (rim colour outside the iris)
 uniform float uEyeMode;        // 0 none, 1 painted eyes, 2 robot screen
-uniform vec4 uEyeL;            // blink, lookX, lookY, -
+uniform vec4 uEyeL;            // blink, lookX, lookY, brow tilt (+ sad, - angry)
 uniform vec4 uEyeR;
 uniform vec2 uFace;            // robot: expression id (0..5, fractional = cross-fade), phase
+uniform vec2 uMood;            // happy (^^ lower lid), pupil scale
 uniform vec3 uFur;             // eyelid colour
 uniform vec3 uLash;
 uniform vec3 uLightDir;        // towards the key light (GL space)
@@ -29,16 +30,19 @@ vec4 eyeShade(vec3 base, vec2 uv, vec4 E, float side, out float glossy) {
     float d = length(uv);
     float inside = 1.0 - smoothstep(0.955, 1.0, d);
     if (inside <= 0.0) return vec4(base, 0.0);
-    vec2 t = vec2(0.5 + (uv.x - E.y) / 2.3, 1.0 - (0.5 + (uv.y - E.z) / 2.3));
+    float sg = side < 0.5 ? 1.0 : -1.0;
+    float ps = max(0.4, uMood.y);
+    vec2 t = vec2(0.5 + (uv.x - E.y) / ps / 2.3, 1.0 - (0.5 + (uv.y - E.z) / ps / 2.3));
     t = clamp(t, 0.002, 0.998);
     vec3 eye = texture2D(uEyes, vec2(t.x * 0.5 + side * 0.5, t.y)).rgb;
     float b = E.x;
-    float yup = 1.06 - b * 1.36 + uv.x * uv.x * b * 0.30;
-    float ylo = -1.06 + b * 0.84;
+    float uu = uv.x * uv.x;
+    float yup = 1.06 - b * 1.36 + uu * b * 0.30 + E.w * uv.x * 0.55 * sg - abs(E.w) * 0.32;
+    float ylo = -1.06 + b * 0.84 + uMood.x * (1.5 - 0.9 * uu);
     float upper = smoothstep(-0.02, 0.02, uv.y - yup);
     float lower = smoothstep(-0.02, 0.02, ylo - uv.y);
     float lid = max(upper, lower);
-    float lash = upper * (1.0 - smoothstep(0.07, 0.11, uv.y - yup)) * smoothstep(0.0, 0.12, b);
+    float lash = upper * (1.0 - smoothstep(0.07, 0.11, uv.y - yup)) * smoothstep(0.0, 0.12, b + abs(E.w));
     vec3 lidc = mix(uFur, uLash, lash);
     vec3 c = mix(eye, lidc, lid);
     glossy = inside * (1.0 - lid);
