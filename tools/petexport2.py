@@ -85,7 +85,7 @@ from PIL import Image
 img = bpy.data.images['tex.png']
 W, H = img.size
 px = (np.array(img.pixels[:], np.float32).reshape(H, W, 4)[::-1, :, :3] * 255).clip(0, 255).astype(np.uint8)
-Image.fromarray(px).resize((1024, 1024), Image.LANCZOS).save(os.path.join(out_dir, f'{name}.jpg'), quality=90)
+Image.fromarray(px).save(os.path.join(out_dir, f'{name}.jpg'), quality=92)
 eyes = {e['side']: e for e in FACE['eyes']}
 a = Image.new('RGB', (512, 256))
 for i, s in enumerate('LR'):

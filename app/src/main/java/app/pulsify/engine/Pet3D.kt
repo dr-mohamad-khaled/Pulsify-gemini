@@ -151,7 +151,7 @@ class Pet3D(private val context: Context) {
     }
 
     fun ensureSprite(px: Int) {
-        val n = px.coerceIn(160, 1024)
+        val n = px.coerceIn(160, 1536)
         if (fbo != 0 && kotlin.math.abs(n - spriteSize) < 32) return
         freeSprite()
         spriteSize = n

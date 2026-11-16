@@ -544,7 +544,7 @@ class Pet3DScene(private val context: Context) : Creature {
         val m = min(w, h)
         val k = size / pet.height
         val boxHalf = pet.boxR * k
-        pet.ensureSprite((boxHalf * 2f * m * 0.9f).toInt())
+        pet.ensureSprite((boxHalf * 2f * m * 1.4f).toInt())   // supersampled: crisp edges and fur
         pet.render()
         pet.beginFx()
         val air = if (onLedge >= 0) 0f else ((y - floorY) / size).coerceIn(0f, 2f)
