@@ -51,6 +51,16 @@ val PET_PUPPY = PetSpecies(
         "zoomies" to "Spin", "yawn" to "Shake"),
     dances = listOf("Dance", "Dance2"), run = "Run", runSpeed = 1.2f, ownFace = true, angry = "Bark",
 )
+/** Gromble's 3D look 'Reaper': a tiny skeleton reaper who tries so hard to be evil. */
+val PET_REAPER = PetSpecies(
+    "reaper", "Walk", 0.42f,
+    listOf("LookAround" to 2f, "EvilLaugh" to 2.2f, "SpellCast" to 1.4f, "Boo" to 1.4f, "CapeSwish" to 1.3f, "HeadTilt" to 1.6f,
+        "TryToFly" to 1.2f, "ChaseButterfly" to 1.2f, "Shake" to 0.8f, "Spin" to 0.8f, "Scared" to 0.8f),
+    "EvilLaugh", "Spin", "Dance", "Tumble",
+    mapOf("laugh" to "EvilLaugh", "plan" to "HeadTilt", "fire" to "SpellCast", "fly" to "TryToFly", "boo" to "Boo",
+        "cape" to "CapeSwish", "attack" to "Attack", "pet" to "Pet"),
+    dances = listOf("Dance"), run = "Run", runSpeed = 1.3f, ownFace = true, angry = "AngryKick",
+)
 /** Snowy v2: Meshy auto-rig + Meshy motions + hand-made acting (face moods, beak, props). */
 val PET_DUCK = PetSpecies(
     "snowy", "Walk", 0.45f,
@@ -570,6 +580,7 @@ fun petSpeciesFor(character: Int, style: Int): PetSpecies? = when {
     character == 3 -> PET_KITTEN
     character == 2 -> PET_PUPPY
     character == 8 -> PET_BOT
+    character == 6 -> PET_REAPER
     else -> null
 }
 const val SNOWY_ID = 10

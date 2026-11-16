@@ -88,6 +88,7 @@ val GROMBLE_INFO = CreatureInfo(
         TrickInfo("fly", "Fly", "🦇"), TrickInfo("boo", "BOO!", "👻"), TrickInfo("cape", "Cape swish", "🧛"),
         TrickInfo("attack", "Attack!", "💥"), TrickInfo("pet", "Pet him", "🫶"),
     ),
+    styles = listOf("Doodle", "Reaper"),
 )
 
 val NUTTY_INFO = CreatureInfo(
