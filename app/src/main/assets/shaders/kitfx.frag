@@ -1,7 +1,7 @@
 // 3D kitty compositing and little effects. GLSL ES 1.00.
 precision mediump float;
 uniform sampler2D uTex;
-uniform float uMode;           // 0 sprite, 1 shadow, 2 heart, 3 star, 4 z, 5 note, 6 bolt, 7 cable, 8 swirl, 9 sparkle
+uniform float uMode;           // 0 sprite, 1 shadow, 2 heart, 3 star, 4 z, 5 note, 6 bolt, 7 cable, 8 swirl, 9 sparkle, 10 bubble, 11 pellet
 uniform vec4 uColor;           // rgb, alpha
 uniform vec4 uCable[6];        // cable control points in quad uv (xy) — 12 points packed 2 per vec4
 varying vec2 vUv;
@@ -76,12 +76,24 @@ void main() {
         float r = length(p), ang = atan(p.y, p.x);
         float s = fract((ang / 6.2832) + r * 1.6);
         a = smoothstep(0.12, 0.0, abs(s - 0.5) - 0.18) * smoothstep(1.0, 0.8, r) * smoothstep(0.0, 0.15, r);
-    } else {
+    } else if (uMode < 9.5) {
         // four-point sparkle
         vec2 q = abs(p);
         float d = pow(q.x, 0.5) + pow(q.y, 0.5);
         a = smoothstep(1.0, 0.75, d);
         col = mix(col, vec3(1.0), smoothstep(0.7, 0.2, d));
+    } else if (uMode < 10.5) {
+        // soap-film bubble: bright rim, clear middle, a highlight
+        float r = length(p);
+        a = smoothstep(1.0, 0.9, r) * (0.18 + 0.82 * smoothstep(0.55, 0.95, r));
+        float h = smoothstep(0.3, 0.0, length(p - vec2(-0.38, 0.4)));
+        a = max(a, h * 0.9);
+        col = mix(col, vec3(1.0), h + 0.3 * smoothstep(0.7, 1.0, r));
+    } else {
+        // food pellet: a soft round crumb
+        float r = length(p);
+        a = smoothstep(1.0, 0.75, r);
+        col *= 0.75 + 0.35 * smoothstep(0.6, -0.4, dot(p, vec2(0.6, -0.6)));
     }
     a *= uColor.a;
     gl_FragColor = vec4(col * a, a);
