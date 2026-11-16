@@ -431,3 +431,67 @@ def library():
     return [Idle(), LookAround(), Walk(), Run(), Sneak(), EvilLaugh(), SpellCast(), Boo(), CapeSwish(), Attack(), Tumble(), TryToFly(),
             Pet(), Poke(), Tickle(), Dangle(), JumpStart(), Air(), Land(), FallAsleep(), Sleep(), WakeUp(), HeadTilt(), Shake(), Spin(),
             Butterfly(), Dance(), AngryKick()]
+
+
+# ------------------------------------------------------------------ charger
+class Plugged(Clip):
+    """Charger in: 'YES! POWER!' arms up, evil laugh of pure joy, a little spin."""
+    def __init__(self):
+        super().__init__('Plugged', 2.8, seed=50)
+        F = self.face; F['happy'].keys((0.2, 0.0), (0.4, 0.8), (2.4, 0.8), (2.8, 0.2))
+        F.extra.append(lambda t: {'jaw': env(t, 0.5, 0.6, 1.8, 2.0) * (0.4 + 0.5 * max(0.0, sinp(t, 0.16)))})
+    def act(self, t, c):
+        k = env(t, 0.1, 0.35, 2.2, 2.6); c.arms(110 * k + 10 * sinp(t, 0.3) * k); c.elbows(-15 * k); c.head(pitch=-20 * k); c.body(pitch=-10 * k)
+        c.spin = 360 * ss((t - 1.0) / 1.0) if t > 1.0 else 0.0; c.root.z += 0.06 * env(t, 1.0, 1.2, 1.8, 2.0)
+
+
+class ChargeRest(Clip):
+    """Charging: sitting smugly, 'plotting', fingers tapping, eyes half shut."""
+    loop = True; group = 'idle'
+    def __init__(self):
+        super().__init__('ChargeRest', 6.0, seed=51)
+        F = self.face; F['bL'].d = F['bR'].d = 0.35; F['tilt'].d = -0.6; F.blinks = [2.0, 4.5]
+    def act(self, t, c):
+        b = sinp(t, 3.0); sit(c, 1.0, b); c.head(pitch=6 + 2 * b, yaw=12 * env(t, 2.0, 2.4, 3.4, 3.8))
+        c.reach(35); c.elbows(70 + 8 * max(0.0, sinp(t, 0.25)))
+
+
+class Tired(Clip):
+    """Low battery: slumped, arms dangling, head drooping, a long sigh."""
+    loop = True; group = 'idle'
+    def __init__(self):
+        super().__init__('Tired', 6.0, seed=52)
+        F = self.face; F['bL'].d = F['bR'].d = 0.6; F['tilt'].d = 0.3; F.blinks = [1.2, 3.4, 5.2]; F.pulse('jaw', 3.6, 0.3, 0.6, 0.4, 0.9)
+    def act(self, t, c):
+        b = sinp(t, 3.0); sit(c, 1.0, b); c.head(pitch=28 + 3 * b - 30 * env(t, 3.5, 3.8, 4.4, 4.8), roll=10 * sinp(t, 6.0)); c.arms(-15); c.body(pitch=14)
+
+
+class Unplugged(Clip):
+    """'HEY! I was USING that!' - stomps and shakes a tiny fist."""
+    def __init__(self):
+        super().__init__('Unplugged', 2.4, seed=53)
+        F = self.face; F['tilt'].keys((0.0, 0.0), (0.2, -0.9), (2.0, -0.9), (2.4, -0.25)); F.pulse('jaw', 0.4, 0.1, 0.8, 0.2, 0.8)
+    def act(self, t, c):
+        k = env(t, 0.0, 0.1, 2.0, 2.4); c.root.z += 0.05 * env(t, 0.0, 0.08, 0.12, 0.3)
+        c.turn(RA, 'Y', 120 * k); c.turn(RFA, 'Y', 40 * k + 25 * sinp(t, 0.18) * k); c.body(pitch=8 * k)
+        st = env(t, 0.6, 0.7, 0.8, 0.95) + env(t, 1.2, 1.3, 1.4, 1.55); c.leg('L', 25 * st); c.squash += 0.06 * st
+
+
+class FullCharge(Clip):
+    """100%: fully powered villain. Cape flare, the BIGGEST evil laugh, spell sparkles."""
+    def __init__(self):
+        super().__init__('FullCharge', 3.6, seed=54)
+        F = self.face; F['tilt'].keys((0.2, -0.3), (0.5, -0.9), (2.9, -0.9), (3.4, 0.0)); F['happy'].keys((0.4, 0.0), (0.7, 0.8), (3.0, 0.8), (3.4, 0.0))
+        F.extra.append(lambda t: {'jaw': env(t, 0.6, 0.8, 2.8, 3.0) * (0.5 + 0.5 * max(0.0, sinp(t, 0.14)))})
+    def act(self, t, c):
+        k = env(t, 0.2, 0.6, 2.9, 3.4); c.arms(110 * k + 8 * sinp(t, 0.28) * k); c.elbows(-25 * k); c.body(pitch=-18 * k + 4 * sinp(t, 0.14) * k)
+        c.head(pitch=-26 * k); c.root.z += 0.1 * k; c.spin = 30 * sinp(t, 1.2) * k
+    def props(self, t, M):
+        ph = (t / 1.2) % 1.0; h = M[HD].translation
+        return {'Heart': heart_at(h + Vector((0.3 * math.sin(ph * 6), -0.15, 0.4 + 0.4 * ph)), 3.0 * ss(ph / 0.2) * (1 - ss((ph - 0.7) / 0.3)))}
+
+
+def library():
+    return [Idle(), LookAround(), Walk(), Run(), Sneak(), EvilLaugh(), SpellCast(), Boo(), CapeSwish(), Attack(), Tumble(), TryToFly(),
+            Pet(), Poke(), Tickle(), Dangle(), JumpStart(), Air(), Land(), FallAsleep(), Sleep(), WakeUp(), HeadTilt(), Shake(), Spin(),
+            Butterfly(), Dance(), AngryKick(), Plugged(), ChargeRest(), Tired(), Unplugged(), FullCharge()]

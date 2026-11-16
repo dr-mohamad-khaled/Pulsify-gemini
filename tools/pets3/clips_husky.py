@@ -515,3 +515,56 @@ def library():
     return [Idle(), Sniff(), Walk(), Run(), Wag(), SitDown(), Sit(), StandUp(), LieDown(), FallAsleep(), Sleep(), WakeUp(),
             Bark(), Howl(), HeadTilt(), PlayBow(), Shake(), ChaseTail(), Dig(), Fetch(), Eat(), Chew(), Butterfly(),
             Poke(), Pet(), Tickle(), Dangle(), JumpStart(), Air(), Land(), Dance('Dance', 118, 30), Dance('Dance2', 96, 31)]
+
+
+# ------------------------------------------------------------------ charger
+class ChargeRest(Clip):
+    """On the charger: lying cosy, chin up, slow content blinks, tail thumping now and then."""
+    loop = True; group = 'idle'
+    def __init__(self):
+        super().__init__('ChargeRest', 6.0, SIT, seed=40, happy=0.5)
+        F = self.face; F['bL'].d = F['bR'].d = 0.3; F.blinks = [1.5, 4.2]
+    def act(self, t, c):
+        b = sinp(t, 3.0); lie_pose(c, 1.0, b); c.head(pitch=4 + 2 * b, yaw=14 * env(t, 2.0, 2.4, 3.4, 3.8))
+        c.tail(wag=14 * sinp(t, 0.5) * env(t, 4.0, 4.2, 5.0, 5.3)); c.jaw = 0.15 + 0.05 * b
+
+
+class Tired(Clip):
+    """Low battery: flat out, chin on paws, ears drooping, a huge sigh and a yawn."""
+    loop = True; group = 'idle'
+    def __init__(self):
+        super().__init__('Tired', 6.0, SIT, seed=41)
+        F = self.face; F['bL'].d = F['bR'].d = 0.55; F.blinks = [1.0, 3.0, 5.0]; F.pulse('jaw', 3.6, 0.35, 0.5, 0.4, 1.1)
+    def act(self, t, c):
+        b = sinp(t, 3.0); lie_pose(c, 1.0, b); c.head(pitch=26 + 2 * b - 30 * env(t, 3.5, 3.8, 4.3, 4.7)); c.ears(back=18)
+        c.squash += 0.04 * env(t, 1.0, 1.4, 1.8, 2.4)
+
+
+class Unplugged(Clip):
+    """Cable pulled: ears shoot up, a little jump, stares at where the charger was, a sad 'hmph'."""
+    def __init__(self):
+        super().__init__('Unplugged', 2.4, seed=42)
+        F = self.face; F['pupil'].keys((0.0, 1.0), (0.1, 1.3), (1.0, 1.3), (1.4, 1.0)); F.pulse('jaw', 1.9, 0.1, 0.15, 0.2, 0.4)
+    def act(self, t, c):
+        k = env(t, 0.0, 0.06, 0.25, 0.6); c.root.z += 0.08 * env(t, 0.0, 0.08, 0.12, 0.35); c.ears(back=-14 * k); c.tail(up=20 * k)
+        l = env(t, 0.6, 0.9, 1.5, 1.8); c.head(yaw=40 * l, pitch=20 * l); c.ears(back=10 * l); c.tail(wag=-10 * l)
+
+
+class FullCharge(Clip):
+    """100%: ZOOMIES! two circles at full speed, then a proud happy bark."""
+    def __init__(self):
+        super().__init__('FullCharge', 3.6, 'dog_run', seed=43, happy=1.0)
+        self.face.blinks = []; self.face.pulse('jaw', 2.9, 0.05, 0.1, 0.1, 1.1)
+    def base(self, E, t):
+        if t > 2.6: return E.sample(*STAND)
+        s, e = E.frames('dog_run'); return E.sample('dog_run', s + (t * FPS) % (e - s))
+    def act(self, t, c):
+        if t < 2.6: c.spin = 720 * ss(t / 2.6); c.jaw = 0.6; c.ears(back=18)
+        c.tail(wag=25 * sinp(t, 0.25), up=20)
+
+
+def library():
+    return [Idle(), Sniff(), Walk(), Run(), Wag(), SitDown(), Sit(), StandUp(), LieDown(), FallAsleep(), Sleep(), WakeUp(),
+            Bark(), Howl(), HeadTilt(), PlayBow(), Shake(), ChaseTail(), Dig(), Fetch(), Eat(), Chew(), Butterfly(),
+            Poke(), Pet(), Tickle(), Dangle(), JumpStart(), Air(), Land(), Dance('Dance', 118, 30), Dance('Dance2', 96, 31),
+            ChargeRest(), Tired(), Unplugged(), FullCharge()]

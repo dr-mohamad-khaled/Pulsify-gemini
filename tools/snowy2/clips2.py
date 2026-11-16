@@ -590,8 +590,63 @@ class Spin(Clip):
         c.flap(hop * (35 + 25 * sinp(t, 0.18))); c.leg('L', 20 * hop); c.leg('R', 20 * hop)
 
 
+# ===================================================================== charger
+class Plugged(Clip):
+    """Charger in: a jolt, happy flaps, two hops and a proud quack."""
+    def __init__(self):
+        super().__init__('Plugged', 2.6, seed=60)
+        F = self.face; F['happy'].keys((0.2, 0.0), (0.4, 1.0), (2.2, 1.0), (2.6, 0.2)); F.pulse('jaw', 1.8, 0.05, 0.15, 0.1, 1.0)
+    def act(self, t, c):
+        k = env(t, 0.0, 0.05, 0.25, 0.45); c.squash = -0.08 * k; c.head(pitch=-15 * k)
+        f = env(t, 0.3, 0.4, 1.5, 1.7); c.flap(55 * f + 30 * sinp(t, 0.18) * f)
+        for a in (0.5, 1.0):
+            h = math.sin(math.pi * max(0.0, min(1.0, (t - a) / 0.35))) if a < t < a + 0.35 else 0.0
+            c.root.z += 0.1 * h
+        q = env(t, 1.75, 1.8, 2.0, 2.2); c.head(pitch=-20 * q); c.body(pitch=-6 * q)
+
+
+class ChargeRest(Clip):
+    """Charging: sitting fluffed like a little loaf, eyes half shut, content."""
+    loop = True; group = 'sleep'
+    def __init__(self):
+        super().__init__('ChargeRest', 6.0, seed=61)
+        F = self.face; F['bL'].d = F['bR'].d = 0.4; F['happy'].d = 0.6; F.looks = []; F.blinks = [1.6, 4.4]
+    def act(self, t, c):
+        b = sinp(t, 3.0); sit_pose(c, 1.0, t, b); c.head(pitch=6 + 2 * b, roll=6 * sinp(t, 6.0), yaw=12 * env(t, 2.0, 2.4, 3.4, 3.8))
+
+
+class Tired(Clip):
+    """Low battery: sagging, wings drooping, head nodding off, a big yawn."""
+    loop = True; group = 'sleep'
+    def __init__(self):
+        super().__init__('Tired', 6.0, seed=62)
+        F = self.face; F['bL'].d = F['bR'].d = 0.6; F.looks = []; F.blinks = [1.0, 2.8, 5.0]; F.pulse('jaw', 3.6, 0.35, 0.5, 0.4, 1.1)
+    def act(self, t, c):
+        b = sinp(t, 3.0); sit_pose(c, 1.0, t, b); c.flap(-14); c.body(pitch=10)
+        c.head(pitch=22 + 3 * b - 30 * env(t, 3.5, 3.8, 4.3, 4.7), roll=10 * sinp(t, 6.0))
+
+
+class Unplugged(Clip):
+    """Cable out: 'QUACK?!' feathers up, looks at the plug, a sulky huff."""
+    def __init__(self):
+        super().__init__('Unplugged', 2.2, seed=63)
+        F = self.face; F['pupil'].keys((0.0, 1.0), (0.1, 1.3), (1.2, 1.3), (1.5, 1.0)); F.pulse('jaw', 0.1, 0.05, 0.15, 0.1, 1.0)
+    def act(self, t, c):
+        k = env(t, 0.0, 0.05, 0.25, 0.55); c.squash = 0.1 * k; c.flap(40 * k); c.root.z += 0.06 * env(t, 0.0, 0.06, 0.1, 0.3)
+        l = env(t, 0.6, 0.9, 1.5, 1.8); c.head(yaw=40 * l, pitch=25 * l)
+
+
+class FullCharge(Clip):
+    """100%: joyful dance and a happy spin."""
+    def __init__(self):
+        super().__init__('FullCharge', 3.4, 'Joyful_Dance_with_Hand_Sway', seed=64)
+        self.face['happy'].d = 1.0
+    def act(self, t, c):
+        c.spin = 360 * ss((t - 1.8) / 1.2) if t > 1.8 else 0.0
+
+
 def library():
-    return [
+    return [Plugged(), ChargeRest(), Tired(), Unplugged(), FullCharge(), 
         Idle(), Curious(), Poke(), HeadTilt(), Shake(), Spin(), Quack(), TryToFly(), Notice(), Preen(), Peck(), Carry(),
         SitDown(), Sleep(), WakeUp(),
         Pet(), Tickle(), Dangle(), Startle(), Tumble(), Kick(), Scared(),

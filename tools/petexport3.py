@@ -40,6 +40,8 @@ EXPORT_DUCK = [
     ('DanceBubble', 'DanceBubble', False), ('DanceCardio', 'DanceCardio', False), ('DanceJoy', 'DanceJoy', False),
     ('DancePop', 'DancePop', False), ('DanceNight', 'DanceNight', False), ('DanceHipHop', 'DanceHipHop', False),
     ('DanceHipHop2', 'DanceHipHop2', False),
+    ('Plugged', 'Plugged', False), ('ChargeRest', 'ChargeRest', True), ('Tired', 'Tired', True), ('Unplugged', 'Unplugged', False),
+    ('FullCharge', 'FullCharge', False),
 ]
 
 EXPORT = [tuple(x) for x in CFG['clips']] if 'clips' in CFG else EXPORT_DUCK
