@@ -73,7 +73,7 @@ class GlLoop(
     private val allCreatures: List<Creature> = creatures + kitty3d + pet3d + astro
     /** The creature this frame wants: by character id, and for Kitty by style (1.. = 3D shapes). */
     private fun pick(): Creature? {
-        petSpeciesFor(input.character, input.style)?.let { pet3d.species = it; return pet3d }
+        petSpeciesFor(input.character, input.style, input.coat)?.let { pet3d.species = it; return pet3d }
         if (input.character == COSMO_ID) return astro
         return creatures.getOrNull(input.character - 1)
     }

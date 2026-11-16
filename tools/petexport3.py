@@ -81,7 +81,7 @@ for o in meshes:
                 vmap[key] = len(verts) - 1
             idx.append(vmap[key])
 assert len(verts) < 65536, len(verts)
-body_h = max(v.co.z for v in bpy.data.objects['Body'].data.vertices) * SCALE
+body_h = CFG.get('height') or max(v.co.z for v in bpy.data.objects['Body'].data.vertices) * SCALE
 print('VERTS', len(verts), 'TRIS', len(idx) // 3, 'BODY H', round(body_h, 3))
 
 # ---------------- textures ----------------

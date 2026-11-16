@@ -230,6 +230,7 @@ val KIWI_INFO = CreatureInfo(
         TrickInfo("squawk", "Squawk!", "📢"), TrickInfo("preen", "Preen", "✨"), TrickInfo("oneleg", "One leg", "🦩"),
         TrickInfo("stretch", "Wing stretch", "🙆"),
     ),
+    styles = listOf("Doodle", "Real 3D"),
 )
 
 fun creatureInfo(id: Int): CreatureInfo? = CREATURES.firstOrNull { it.id == id }

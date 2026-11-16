@@ -30,6 +30,8 @@ class PetSpecies(
     val runSpeed: Float = 1f,
     val ownFace: Boolean = false,          // clips carry their own blinks, glances and moods (PET2)
     val angry: String? = null,             // too many pokes in a row
+    val alias: Map<String, String> = emptyMap(),   // scene clip name -> this pet's clip (birds fly instead of jump)
+    val big: Float = 1f,                   // on-screen size factor
 )
 
 val PET_KITTEN = PetSpecies(
@@ -83,6 +85,24 @@ val PET_BOT = PetSpecies(
         "faces" to "GiveHeart", "polish" to "OilDrink", "tune" to "Juggle", "clock" to "LookAround"),
 )
 
+/** The 3D birds (Kiwi's 3D look): one shared hand-made library of 50 motions, wings that really fold and fly. */
+private val BIRD_LIFE = listOf("LookAround" to 2.5f, "HeadTilt" to 2f, "HeadBob" to 1.6f, "Preen" to 1.6f, "PreenTail" to 1f,
+    "Scratch" to 1.2f, "Fluff" to 1.4f, "Shake" to 0.8f, "Stretch" to 1.2f, "WingStretch" to 1.2f, "Yawn" to 0.8f, "Peck" to 1.4f,
+    "Eat" to 1.3f, "Chirp" to 1.6f, "Talk" to 1.5f, "Notice" to 1f, "Hop" to 1f, "Mirror" to 0.8f, "Swing" to 0.8f,
+    "Upside" to 0.6f, "ChaseButterfly" to 1f)
+private val BIRD_TRICKS = mapOf("kiss" to "Mirror", "talk" to "Talk", "whistle" to "Chirp", "dance" to "DanceHeadbang",
+    "fly" to "Jump", "hang" to "Upside", "seed" to "Eat", "squawk" to "Notice", "preen" to "Preen", "oneleg" to "Scratch",
+    "stretch" to "WingStretch")
+private val BIRD_ALIAS = mapOf("JumpStart" to "TakeOff", "JumpAir" to "Fly", "JumpLand" to "Land", "Spin" to "DanceSpin")
+private fun bird(model: String) = PetSpecies(
+    model, "Walk", 0.45f, BIRD_LIFE, "Chirp", "Plugged", "DanceBob", "Fluff", BIRD_TRICKS,
+    dances = listOf("DanceBob", "DanceWings", "DanceSide", "DanceSpin", "DanceHeadbang"), run = "Run", runSpeed = 1.2f,
+    ownFace = true, angry = "Angry", alias = BIRD_ALIAS, big = 0.85f,
+)
+val PET_BUDGIE = bird("budgie")
+val PET_COCKATIEL = bird("cockatiel")
+val PET_RINGNECK = bird("ringneck")
+
 /**
  * A Meshy pet with baked clips: background life (with props), touch reactions (pet, poke, tickle,
  * carry), hops across the floor, and jumps on top of the widgets on the home screen.
@@ -90,6 +110,8 @@ val PET_BOT = PetSpecies(
 class Pet3DScene(private val context: Context) : Creature {
     override var listener: SceneListener? = null
     @Volatile var species: PetSpecies = PET_KITTEN
+        set(v) { if (v !== field) { field = v; laidOut = false } }
+    private var laidOut = false
     var viewLag = 0f
 
     private val pet = Pet3D(context)
@@ -147,7 +169,7 @@ class Pet3DScene(private val context: Context) : Creature {
     private val parts = ArrayList<P>()
 
     override val busy: Boolean
-        get() = touching || sinceTouch < 2f || mode != Mode.FLOOR || (curName != "Idle" && curName != "Sleep") || parts.isNotEmpty()
+        get() = touching || sinceTouch < 2f || mode != Mode.FLOOR || (!isIdle() && curName != "Sleep") || parts.isNotEmpty()
 
     // ------------------------------------------------------------ lifecycle
     override fun onSurfaceCreated() { pet.create(); pet.load(species.model); cur = null }
@@ -157,7 +179,8 @@ class Pet3DScene(private val context: Context) : Creature {
         ground = y; layout()
     }
     private fun layout() {
-        size = min(0.42f, halfW * 0.8f)
+        laidOut = true
+        size = min(0.42f, halfW * 0.8f) * species.big
         floorY = if (ground.isNaN()) -halfH + 0.3f else ground
         if (h.toFloat() / w < 1.5f) { size = min(0.32f, halfW * 0.55f); floorY = -halfH + 0.12f }
         if (bottomInset > 0f) {
@@ -172,13 +195,21 @@ class Pet3DScene(private val context: Context) : Creature {
 
     // ------------------------------------------------------------ clips
     private fun play(name: String, restart: Boolean = true): Boolean {
-        val c = pet.clips[name] ?: return false
+        val c = pet.clips[species.alias[name] ?: name] ?: return false
         if (!restart && cur === c) return true
         fadeFrom = cur; fadeFromT = curT; fade = if (cur == null) 1f else 0f
         cur = c; curT = 0f
         return true
     }
     private val curName get() = cur?.name ?: ""
+    private var chargingNow = false; private var lowNow = false; private var fullDone = false
+    /** The resting loop right now: content on the charger, droopy on a low battery, else the normal idle. */
+    private val idleName: String get() = when {
+        chargingNow && pet.clips.containsKey("ChargeRest") -> "ChargeRest"
+        lowNow && !chargingNow && pet.clips.containsKey("Tired") -> "Tired"
+        else -> "Idle"
+    }
+    private fun isIdle() = curName == "Idle" || curName == "ChargeRest" || curName == "Tired"
     private fun clipDone() = cur?.let { !it.loop && curT >= it.duration } ?: true
 
     private fun pickLife(input: SceneInput) {
@@ -362,7 +393,8 @@ class Pet3DScene(private val context: Context) : Creature {
     override fun update(dt: Float, input: SceneInput) {
         time += dt; sinceTouch += dt
         if (pet.loaded != species.model) { pet.load(species.model); cur = null; fadeFrom = null }
-        if (cur == null) play("Idle")
+        if (!laidOut) layout()
+        if (cur == null) play(idleName)
         mood = input.mood
         musicOn = input.audio.source != AudioFrame.Source.NONE && input.audio.level > 0.02f
         refreshLedges(input)
@@ -378,7 +410,17 @@ class Pet3DScene(private val context: Context) : Creature {
 
     private fun charger(input: SceneInput) {
         val ch = input.charging
-        if (!chargeKnown) { chargeKnown = true; wasCharging = ch; return }
+        chargingNow = ch; lowNow = input.lowBattery
+        if (!chargeKnown) { chargeKnown = true; wasCharging = ch; fullDone = input.battery >= 0.995f; return }
+        if (!ch && wasCharging) {                          // cable pulled
+            if (input.battery < 0.995f && !busyActing() && mode != Mode.SLEEP) play("Unplugged")
+            fullDone = false
+        }
+        if (ch && input.battery >= 0.995f && !fullDone) {   // just reached 100 %
+            fullDone = true
+            if (!busyActing()) { if (mode == Mode.SLEEP) wake(); play("FullCharge"); discover("full charge") }
+            burst(2f, 5, x, headY + size * 0.2f, 1f, 0.85f, 0.3f)
+        }
         if (ch && !wasCharging) {
             discover("charger")
             if (mode == Mode.SLEEP) wake()
@@ -396,8 +438,9 @@ class Pet3DScene(private val context: Context) : Creature {
                     if (L == null || !visible(L)) { fallOff(); return }
                 }
                 if (held && touching) { if (clipDone()) play("Pet"); return }
-                if (clipDone()) { held = false; play("Idle", false) }
-                if (curName != "Idle") return
+                if (clipDone()) { held = false; play(idleName, false) }
+                if (!isIdle()) return
+                if (curName != idleName) { play(idleName, false); return }
                 if (musicOn && input.audio.beat > 0.8f && time - lastBeat > 2.5f) { lastBeat = time; play(species.dances.randomOrNull() ?: species.dance); return }
                 nextLife -= dt
                 if (nextLife > 0f) return
@@ -429,7 +472,7 @@ class Pet3DScene(private val context: Context) : Creature {
                 if (abs(d) < 0.01f) {
                     x = targetX; mode = Mode.FLOOR; facing = 0f
                     val n = afterWalk; afterWalk = null
-                    if (n != null) play(n) else play("Idle")
+                    if (n != null) play(n) else play(idleName)
                 } else {
                     x += sign(d) * min(abs(d), walkSpd * size * dt)
                     if (curName != walkClip) play(walkClip.ifEmpty { species.walk }, false)
@@ -449,7 +492,7 @@ class Pet3DScene(private val context: Context) : Creature {
                 if (sleepLeft <= 0f && curName == "Sleep") wake()
             }
         }
-        if (mode == Mode.FLOOR && curName == "WakeUp" && clipDone()) play("Idle")
+        if (mode == Mode.FLOOR && curName == "WakeUp" && clipDone()) play(idleName)
     }
 
     private fun fallOff() {
@@ -574,9 +617,10 @@ class Pet3DScene(private val context: Context) : Creature {
 }
 
 /** Which Meshy pet (if any) a character id + chosen look maps to. Snowy (10) only exists in 3D. */
-fun petSpeciesFor(character: Int, style: Int): PetSpecies? = when {
+fun petSpeciesFor(character: Int, style: Int, coat: Int = 0): PetSpecies? = when {
     character == SNOWY_ID -> PET_DUCK
     style <= 0 -> null
+    character == 4 -> when (coat) { 0 -> PET_RINGNECK; 2 -> PET_COCKATIEL; else -> PET_BUDGIE }
     character == 3 -> PET_KITTEN
     character == 2 -> PET_PUPPY
     character == 8 -> PET_BOT
