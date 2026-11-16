@@ -111,6 +111,18 @@ val PET_LION = PetSpecies(
     dances = listOf("DanceBob", "DanceStomp", "DanceRoar", "DanceSpin"), run = "Run", runSpeed = 1.3f, ownFace = true, angry = "Angry",
     alias = mapOf("Spin" to "DanceSpin", "Shake" to "Sneeze"),
 )
+/** Luna the fluffy kitten (Kitty's 3D look): Meshy cat motions + Leo's hand-made library adapted for a cat. */
+val PET_LUNA = PetSpecies(
+    "luna", "Walk", 0.5f,
+    listOf("LookAround" to 2.5f, "HeadTilt" to 2f, "Yawn" to 1f, "Sneeze" to 0.6f, "Stretch" to 1.4f, "Lounge" to 1f, "Knead" to 1.2f,
+        "Groom" to 1.6f, "RollOver" to 1f, "ChaseTail" to 0.8f, "Pounce" to 1.4f, "Meow" to 1.6f, "Beg" to 0.7f, "PlayBall" to 1.6f,
+        "ChaseButterfly" to 1.2f, "Sit" to 1.2f),
+    "Meow", "Plugged", "DanceBob", "Hiss",
+    mapOf("pounce" to "Pounce", "zoomies" to "ChaseTail", "purr" to "Pet", "groom" to "Groom", "loaf" to "Sleep", "box" to "Sleep",
+        "trill" to "Meow", "stretch" to "Stretch", "knock" to "PlayBall", "cucumber" to "Hiss"),
+    dances = listOf("DanceBob", "DanceStomp", "DanceRoar", "DanceSpin"), run = "Run", runSpeed = 1.3f, ownFace = true, angry = "Hiss",
+    alias = mapOf("Spin" to "DanceSpin", "Shake" to "Sneeze"),
+)
 val PET_BUDGIE = bird("budgie")
 val PET_COCKATIEL = bird("cockatiel")
 val PET_RINGNECK = bird("ringneck")
@@ -121,7 +133,7 @@ val PET_RINGNECK = bird("ringneck")
  */
 class Pet3DScene(private val context: Context) : Creature {
     override var listener: SceneListener? = null
-    @Volatile var species: PetSpecies = PET_KITTEN
+    @Volatile var species: PetSpecies = PET_LUNA
         set(v) { if (v !== field) { field = v; laidOut = false } }
     private var laidOut = false
     var viewLag = 0f
@@ -634,7 +646,7 @@ fun petSpeciesFor(character: Int, style: Int, coat: Int = 0): PetSpecies? = when
     character == LEO_ID -> PET_LION
     style <= 0 -> null
     character == 4 -> when (coat) { 0 -> PET_RINGNECK; 2 -> PET_COCKATIEL; else -> PET_BUDGIE }
-    character == 3 -> PET_KITTEN
+    character == 3 -> PET_LUNA
     character == 2 -> PET_PUPPY
     character == 8 -> PET_BOT
     character == 6 -> PET_REAPER

@@ -227,7 +227,7 @@ private val BASE_CREATURES = listOf(
             EnvInfo("Box Fort", 8, c1 = 0xFFD9A066.toInt(), c2 = 0xFFF06292.toInt()),
         )),
         listOf(TrickInfo("pounce", "Pounce", "🎯"), TrickInfo("knock", "Knock the cup", "☕"), TrickInfo("cucumber", "Cucumber!", "🥒"), TrickInfo("box", "If it fits", "📦"), TrickInfo("zoomies", "Zoomies", "💨"), TrickInfo("purr", "Purr", "💜"), TrickInfo("groom", "Groom", "👅"), TrickInfo("loaf", "Loaf", "🍞"), TrickInfo("trill", "Trill", "🎶"), TrickInfo("stretch", "Stretch", "🙆")),
-        styles = listOf("Doodle", "Snowball"),
+        styles = listOf("Doodle", "Luna"),
     ),
 )
 
