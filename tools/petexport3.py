@@ -91,7 +91,9 @@ W, H = img.size
 px = (np.array(img.pixels[:], np.float32).reshape(H, W, 4)[::-1, :, :3] * 255).clip(0, 255).astype(np.uint8)
 Image.fromarray(px).save(os.path.join(out_dir, f'{name}.jpg'), quality=92)
 eyes = {e['side']: e for e in FACE['eyes']}
-if EYEMODE == 3:
+if EYEMODE == 0:
+    fur = (0.0, 0.0, 0.0); lash = (0.0, 0.0, 0.0); iris = None
+elif EYEMODE == 3:
     Image.open(CFG['atlas']).save(os.path.join(out_dir, f'{name}_eyes.png'))
     fur = tuple(FACE['lid']); lash = tuple(CFG.get('lash', (0.08, 0.07, 0.07)))
     iris = [*eyes['L']['ioff'], *eyes['R']['ioff']]

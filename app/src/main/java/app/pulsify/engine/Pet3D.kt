@@ -51,6 +51,8 @@ class Pet3D(private val context: Context) {
     var nCtl = 8; private set
     var face = 0f; var facePhase = 0f
     var yaw = 0f; var lean = 0f
+    /** Height (model units) the yaw/lean turn around: 0 = the feet, boxCz = the middle of the sprite. */
+    var pivot = 0f
     var dim = 0f; var glow = 0f
 
     private val vp = FloatArray(16); private val model = FloatArray(16)
@@ -185,8 +187,10 @@ class Pet3D(private val context: Context) {
         if (loaded.isEmpty() || fbo == 0) return
         // model: Blender (x, y, z) -> GL (x, z, -y), turned by [yaw] about the feet, leaned by [lean]
         Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, 0f, pivot, 0f)
         Matrix.rotateM(model, 0, deg(yaw), 0f, 1f, 0f)
         Matrix.rotateM(model, 0, deg(lean), 1f, 0f, 0f)
+        Matrix.translateM(model, 0, 0f, -pivot, 0f)
         val conv = floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, 1f)
         Matrix.multiplyMM(tmp, 0, model, 0, conv, 0)
         System.arraycopy(tmp, 0, model, 0, 16)

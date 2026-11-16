@@ -160,10 +160,23 @@ val SNOWY_INFO = CreatureInfo(
     ),
 )
 
-val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO + SNOWY_INFO }
+const val COSMO_ID = 11
+
+val COSMO_INFO = CreatureInfo(
+    COSMO_ID, "Cosmo", "Little astronaut, falling forever through deep space. He's fine with it.",
+    "Tap: he falls harder and the stars streak past. Swipe across him: he floats off to your next home screen.",
+    0xFF9DB8FF.toInt(), listOf(CoatInfo("Star suit", 0xFFF2F0F7.toInt(), 0xFFFFB36B.toInt())),
+    listOf(EnvInfo("Deep Space", SOLID_WORLD, c1 = 0xFF000000.toInt(), c2 = 0xFF0A0614.toInt())),
+    listOf(
+        TrickInfo("faster", "Fall faster", "🚀"), TrickInfo("wave", "Wave", "👋"), TrickInfo("curl", "Somersault", "🌀"),
+        TrickInfo("swim", "Space swim", "🏊"), TrickInfo("thumbs", "Thumbs up", "👍"), TrickInfo("relax", "Chill", "😌"),
+    ),
+)
+
+val CREATURES: List<CreatureInfo> by lazy { BASE_CREATURES + KIWI_INFO + GLOWY_INFO + GROMBLE_INFO + NUTTY_INFO + BOLT_INFO + GLOOP_INFO + SNOWY_INFO + COSMO_INFO }
 
 /** Creatures that can also live in a home-screen widget (the 2D friends). */
-val BUDDY_CREATURES: List<CreatureInfo> by lazy { CREATURES.filter { it.id != SNOWY_ID } }
+val BUDDY_CREATURES: List<CreatureInfo> by lazy { CREATURES.filter { it.id != SNOWY_ID && it.id != COSMO_ID } }
 
 private val BASE_CREATURES = listOf(
     CreatureInfo(
