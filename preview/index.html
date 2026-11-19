@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulsify 5.9 preview</title>
+<style>
+  :root { --bg:#09070E; --card:#15121E; --lav:#CDB4FF; --amber:#FFB36B; --sub:#9E96B0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:#fff; font-family: Inter, "Plus Jakarta Sans", system-ui, sans-serif; }
+  body { display:flex; gap:28px; align-items:center; justify-content:center; padding:20px; flex-wrap:wrap; }
+  #phone { position:relative; height:min(92vh, 860px); aspect-ratio: 9 / 19.5; border-radius:38px; overflow:hidden;
+           box-shadow:0 0 0 10px #1E192B, 0 0 0 11px rgba(205,180,255,.25), 0 30px 80px rgba(0,0,0,.6); background:#000; touch-action:none; }
+  #gl { width:100%; height:100%; display:block; }
+  #fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #hud { position:absolute; left:12px; top:14px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#4ADE80;
+         background:#1A2E2BCC; padding:5px 9px; border-radius:999px; pointer-events:none; }
+  #panel { width:min(420px, 92vw); background:var(--card); border-radius:22px; padding:18px 18px 14px; border:1px solid rgba(205,180,255,.14); }
+  h1 { font-size:20px; margin:0 0 2px; } .sub { color:var(--sub); font-size:13px; margin:0 0 14px; }
+  .lbl { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--sub); margin:12px 0 7px; }
+  .row { display:flex; flex-wrap:wrap; gap:7px; }
+  button { background:#1E192B; color:#fff; border:1px solid rgba(205,180,255,.18); border-radius:999px; padding:8px 13px; font:inherit; font-size:13px; cursor:pointer; }
+  button.on { background:var(--lav); color:#0D0A14; border-color:var(--lav); font-weight:600; }
+  button:active { transform:scale(.96); }
+  .tip { color:var(--sub); font-size:12.5px; line-height:1.5; margin-top:14px; }
+  #load { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--sub); font-size:14px; background:#000; }
+</style>
+</head>
+<body>
+<div id="phone"><canvas id="gl"></canvas><canvas id="fx"></canvas><div id="hud">60 FPS</div><div id="load">Loading…</div></div>
+<div id="panel">
+  <h1>Pulsify 5.9.2 — cats v3, reaper orbit, faster Cosmo</h1>
+  <p class="sub">Cats: new 45-bone rig with volume-preserving joints and all 36 moves redone (planted paws, curling wrists, tail follow-through, scruff reflex). <b>Reaper · home-screen orbit</b> (volcanic world): swipe left/right like your launcher pages — he gets startled, searches for you, finds you, then turns. Press <b>Notification</b>: he walks up and knocks on the glass. <b>Charger</b>: he conjures a fireball that grows with the battery. Four worlds under World. <b>♫ Beat</b> = he dances. <b>Cosmo</b>: about 25× lighter background.</p>
+  <div class="lbl">Creature</div><div class="row" id="pets"></div>
+  <div class="lbl">World</div><div class="row" id="worlds"></div>
+  <div class="lbl">Time of day</div><div class="row" id="times"></div>
+  <div class="lbl">Tricks</div><div class="row" id="tricks"></div>
+  <p class="tip">Tap the cat: it flinches (or wakes up if it's asleep) · tap 3× fast: sneeze · poke it a lot: hiss · hold it: it purrs and leans into your hand · drag it: pick it up by the scruff · tap or drag anywhere: it looks at your finger · <b>♫ Beat</b>: it dances to the music, with a spin on every drop. Leave it alone and it lives: naps, kneads, chases its tail, zoomies…</p>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

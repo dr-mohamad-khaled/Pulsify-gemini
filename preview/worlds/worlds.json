@@ -1,0 +1,38 @@
+{
+ "60": {
+  "name": "Cosy Living Room",
+  "ground": 0.66,
+  "horizon": 0.53,
+  "fx": 6,
+  "sky": false,
+  "live": 4
+ },
+ "61": {
+  "name": "Snowy Cabin",
+  "ground": 0.68,
+  "horizon": 0.55,
+  "fx": 3,
+  "sky": true,
+  "live": 12
+ },
+ "63": {
+  "name": "Savanna",
+  "ground": 0.66,
+  "horizon": 0.53,
+  "fx": 4,
+  "sky": true,
+  "live": 9
+ },
+ "64": {
+  "name": "Waterhole",
+  "ground": 0.62,
+  "horizon": 0.38,
+  "fx": 4,
+  "sky": true,
+  "live": 11,
+  "water": [
+   0.17,
+   0.36
+  ]
+ }
+}
